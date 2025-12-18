@@ -8,13 +8,14 @@ partial class BytecodeDebugAdapter
 {
     protected override DisassembleResponse HandleDisassembleRequest(DisassembleArguments arguments)
     {
-        if (!arguments.MemoryReference.StartsWith('c') || Processor is null)
+        if (Processor is null
+            || !int.TryParse(arguments.MemoryReference, out int address))
         {
             return new DisassembleResponse();
         }
         else
         {
-            int start = int.Parse(arguments.MemoryReference[1..]) + (arguments.Offset ?? 0);
+            int start = address + (arguments.Offset ?? 0);
             int length = arguments.InstructionCount;
 
             List<DisassembledInstruction> result = [];

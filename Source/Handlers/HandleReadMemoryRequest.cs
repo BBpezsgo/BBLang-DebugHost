@@ -7,13 +7,14 @@ partial class BytecodeDebugAdapter
 {
     protected override ReadMemoryResponse HandleReadMemoryRequest(ReadMemoryArguments arguments)
     {
-        if (!arguments.MemoryReference.StartsWith('m') || Processor is null)
+        if (Processor is null
+            || !int.TryParse(arguments.MemoryReference, out int address))
         {
             return new ReadMemoryResponse();
         }
         else
         {
-            int start = int.Parse(arguments.MemoryReference[1..]) + (arguments.Offset ?? 0);
+            int start = address + (arguments.Offset ?? 0);
             int length = arguments.Count;
 
             start = Math.Clamp(start, 0, Processor.Memory.Length - 1);

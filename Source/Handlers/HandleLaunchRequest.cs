@@ -32,9 +32,10 @@ partial class BytecodeDebugAdapter
             throw new ProtocolException("Launch failed because 'program' files does not exist.");
         }
 
-        Reset();
+        DisposeSession();
 
         NoDebug = arguments.ConfigurationProperties.GetValueAsBool("noDebug") ?? false;
+        StopOnEntry = arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false;
 
         VirtualIO io = new();
         List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(io);
@@ -102,7 +103,7 @@ partial class BytecodeDebugAdapter
             Generated.GeneratedUnmanagedFunctions
         );
 
-        if (!NoDebug && (arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false))
+        if (!NoDebug && StopOnEntry)
         {
             RequestStop(StopReason_Pause.Instance);
         }

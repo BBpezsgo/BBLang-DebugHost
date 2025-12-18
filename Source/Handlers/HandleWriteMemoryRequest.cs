@@ -7,15 +7,16 @@ partial class BytecodeDebugAdapter
 {
     protected override WriteMemoryResponse HandleWriteMemoryRequest(WriteMemoryArguments arguments)
     {
-        if (!arguments.MemoryReference.StartsWith('m') || Processor is null)
+        if (Processor is null
+            || !int.TryParse(arguments.MemoryReference, out int address))
         {
             return new WriteMemoryResponse();
         }
         else
         {
-            int start = int.Parse(arguments.MemoryReference[1..]) + (arguments.Offset ?? 0);
+            int start = address + (arguments.Offset ?? 0);
             if (start < 0 || start >= Processor.Memory.Length) return new WriteMemoryResponse();
-            
+
             ReadOnlySpan<byte> data = Convert.FromBase64String(arguments.Data);
             Span<byte> destination = Processor.Memory.AsSpan(start);
 

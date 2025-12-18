@@ -25,6 +25,7 @@ partial class BytecodeDebugAdapter
             SupportsWriteMemoryRequest = true,
             SupportsDisassembleRequest = true,
             SupportsExceptionInfoRequest = true,
+            SupportsInstructionBreakpoints = true,
         };
     }
 }

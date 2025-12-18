@@ -29,6 +29,7 @@ partial class BytecodeDebugAdapter
     RuntimeException? CrashReason;
     int Time;
     bool NoDebug;
+    bool StopOnEntry;
 
     void RuntimeImpl()
     {
@@ -173,6 +174,18 @@ partial class BytecodeDebugAdapter
             if (!Processor.IsDone && StopReason is StopReason_StepForward or StopReason_StepIn or StopReason_StepOut)
             {
                 RequestStopUnsafe(StopReason);
+            }
+
+            foreach ((Breakpoint Breakpoint, InstructionBreakpoint InstructionBreakpoint, int Address) item in InstructionBreakpoints)
+            {
+                if (item.Address != Processor.Registers.CodePointer) continue;
+
+                Log.WriteLine($"BREAKPOINT HIT at {item.Address}");
+
+                RequestStopUnsafe(new StopReason_Breakpoint()
+                {
+                    Breakpoint = item.Breakpoint,
+                });
             }
 
             foreach (List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> bps in Breakpoints.Values)

@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
@@ -13,10 +16,38 @@ partial class BytecodeDebugAdapter
 
         using (SyncLock.EnterScope())
         {
-            foreach (var item in StackFrames)
+            foreach (FetchedFrame item in StackFrames)
             {
-                if (item.Frame.Id != arguments.FrameId) continue;
-                return new ScopesResponse([.. item.Scopes.Select(v => v.Scope)]);
+                if (item.Id != arguments.FrameId) continue;
+                List<Scope> result = [];
+                foreach (FetchedScope scope in item.Scopes)
+                {
+                    (string name, Scope.PresentationHintValue presentationHint) = scope.Kind switch
+                    {
+                        FetchedScopeKind.ReturnValue => ("ReturnValue", Scope.PresentationHintValue.ReturnValue),
+                        FetchedScopeKind.Locals => ("Locals", Scope.PresentationHintValue.Locals),
+                        FetchedScopeKind.Arguments => ("Arguments", Scope.PresentationHintValue.Arguments),
+                        FetchedScopeKind.Internals => ("Internals", default),
+                        _ => throw new UnreachableException(),
+                    };
+                    result.Add(new Scope()
+                    {
+                        Line = LineToClient(scope.Value.Location.Location.Position.Range.Start.Line),
+                        EndLine = LineToClient(scope.Value.Location.Location.Position.Range.End.Line),
+                        Column = ColumnToClient(scope.Value.Location.Location.Position.Range.Start.Character),
+                        EndColumn = ColumnToClient(scope.Value.Location.Location.Position.Range.End.Character),
+                        NamedVariables = scope.Variables.Length,
+                        Name = name,
+                        PresentationHint = presentationHint,
+                        Source = new Source()
+                        {
+                            Path = scope.Value.Location.Location.File.ToString(),
+                            Name = Path.GetFileName(scope.Value.Location.Location.File.ToString()),
+                        },
+                        VariablesReference = scope.Id,
+                    });
+                }
+                return new ScopesResponse(result);
             }
         }
 

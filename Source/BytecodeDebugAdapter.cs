@@ -29,8 +29,61 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
     readonly Dictionary<Uri, List<Breakpoint>> InvalidBreakpoints = [];
     readonly Dictionary<Uri, List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)>> Breakpoints = [];
+    readonly List<(Breakpoint Breakpoint, InstructionBreakpoint InstructionBreakpoint, int Address)> InstructionBreakpoints = [];
 
-    readonly List<(StackFrame Frame, List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id, StackElementInformation StackItem)> Variables)> Scopes)> StackFrames = [];
+    readonly struct FetchedVariable
+    {
+        public readonly StackElementInformation Value;
+
+        public FetchedVariable(StackElementInformation value)
+        {
+            Value = value;
+        }
+    }
+
+    enum FetchedScopeKind
+    {
+        ReturnValue,
+        Locals,
+        Arguments,
+        Internals,
+    }
+
+    readonly struct FetchedScope
+    {
+        public readonly int Id;
+        public readonly FetchedScopeKind Kind;
+        public readonly ImmutableArray<FetchedVariable> Variables;
+        public readonly ScopeInformation Value;
+
+        public FetchedScope(int id, FetchedScopeKind kind, ImmutableArray<FetchedVariable> variables, ScopeInformation value)
+        {
+            Id = id;
+            Kind = kind;
+            Variables = variables;
+            Value = value;
+        }
+    }
+
+    readonly struct FetchedFrame
+    {
+        public readonly int Id;
+        public readonly CallTraceItem Raw;
+        public readonly FunctionInformation Function;
+        public readonly ImmutableArray<ScopeInformation> RawScopes;
+        public readonly ImmutableArray<FetchedScope> Scopes;
+
+        public FetchedFrame(int id, CallTraceItem raw, FunctionInformation function, ImmutableArray<ScopeInformation> rawScopes, ImmutableArray<FetchedScope> scopes)
+        {
+            Id = id;
+            Raw = raw;
+            Function = function;
+            RawScopes = rawScopes;
+            Scopes = scopes;
+        }
+    }
+
+    readonly List<FetchedFrame> StackFrames = [];
     readonly List<(GeneralType Type, int Id, int Address, string ParentName)> IndirectVariables = [];
     UniqueIds CurrentUniqueIds;
 
@@ -42,16 +95,15 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         Log = log;
     }
 
-    void Reset()
+    void ResetSession()
     {
         Compiled = default;
         Generated = default;
-        Processor = null;
         InvalidBreakpoints.Clear();
         Breakpoints.Clear();
+        InstructionBreakpoints.Clear();
         StackFrames.Clear();
         IndirectVariables.Clear();
-        IsDisconnected = false;
         IsStopped = false;
         LastStopContext = null;
         ShouldStop = false;
@@ -65,6 +117,13 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         StdOutModifiedAt = 0;
         RuntimeThread?.Join();
         RuntimeThread = null;
+    }
+
+    void DisposeSession()
+    {
+        ResetSession();
+        Processor = null;
+        IsDisconnected = false;
         NoDebug = false;
     }
 
@@ -91,6 +150,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             Type = type.ToString(),
             Name = name,
             Value = "?",
+            MemoryReference = address.Start.ToString(),
         };
 
         if (address.Start < 0 || address.End >= memory.Length)
@@ -122,7 +182,6 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 {
                     int pointerValue = memory.Get<int>(address.Start);
                     variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
-                    variable.MemoryReference = $"m{pointerValue}";
                     variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
                     break;
                 }
@@ -130,8 +189,9 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 {
                     if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
                     {
-                        variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
                         variable.Value = "[...]";
+                        variable.IndexedVariables = v.Length.Value;
+                        variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
                     }
                     else
                     {
@@ -143,13 +203,13 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 {
                     variable.Value = "{...}";
                     variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
+                    variable.NamedVariables = v.Struct.Fields.Length;
                     break;
                 }
                 case FunctionType v:
                 {
                     int pointerValue = memory.Get<int>(address.Start);
                     variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
-                    variable.MemoryReference = $"c{pointerValue}";
                     break;
                 }
                 case GenericType:
@@ -198,8 +258,6 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             trace = _trace;
         }
 
-        ReadOnlySpan<byte> memory = Processor.Memory;
-
         foreach (CallTraceItem frame in trace)
         {
             if (frame.InstructionPointer < 0 || frame.InstructionPointer >= Processor.Code.Length) continue;
@@ -208,158 +266,68 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             int frameId = CurrentUniqueIds.Next();
             string? functionName = f.IsValid ? (f.Identifier ?? f.Function?.ToReadable(f.TypeArguments) ?? "<unknown function>") : null;
 
-            StackFrame stackFrame;
-            if (Processor.DebugInformation.TryGetSourceLocation(frame.InstructionPointer, out SourceCodeLocation location))
-            {
-                stackFrame = new StackFrame()
-                {
-                    Id = frameId,
-                    Name = functionName ?? $"<{frame.InstructionPointer}>",
-                    Line = LineToClient(location.Location.Position.Range.Start.Line),
-                    EndLine = LineToClient(location.Location.Position.Range.End.Line),
-                    Column = LineToClient(location.Location.Position.Range.Start.Character),
-                    EndColumn = LineToClient(location.Location.Position.Range.End.Character),
-                    Source = new Source()
-                    {
-                        Name = Path.GetFileName(location.Location.File.ToString()),
-                        Path = location.Location.File.ToString(),
-                    },
-                };
-            }
-            else if (f.IsValid && f.File is not null)
-            {
-                stackFrame = new StackFrame()
-                {
-                    Id = frameId,
-                    Name = functionName ?? $"<{frame.InstructionPointer}>",
-                    Line = LineToClient(f.SourcePosition.Range.Start.Line),
-                    EndLine = LineToClient(f.SourcePosition.Range.End.Line),
-                    Column = LineToClient(f.SourcePosition.Range.Start.Character),
-                    EndColumn = LineToClient(f.SourcePosition.Range.End.Character),
-                    Source = f.File is null ? null : new Source()
-                    {
-                        Name = Path.GetFileName(f.File.ToString()),
-                        Path = f.File.ToString(),
-                    },
-                };
-            }
-            else
-            {
-                stackFrame = new StackFrame()
-                {
-                    Id = frameId,
-                    Name = functionName ?? $"<{frame.InstructionPointer}>",
-                };
-            }
-
-            List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id, StackElementInformation StackItem)> Variables)> frameScopes = [];
+            List<FetchedScope> frameScopes = [];
             ImmutableArray<ScopeInformation> _scopes = Processor.DebugInformation.GetScopes(frame.InstructionPointer);
 
             foreach (ScopeInformation scope in _scopes)
             {
-                List<(Variable Variable, int Id, StackElementInformation StackItem)> locals = [];
-                List<(Variable Variable, int Id, StackElementInformation StackItem)> arguments = [];
-                List<(Variable Variable, int Id, StackElementInformation StackItem)> internals = [];
-                List<(Variable Variable, int Id, StackElementInformation StackItem)> returnValue = [];
+                List<FetchedVariable> locals = [];
+                List<FetchedVariable> arguments = [];
+                List<FetchedVariable> internals = [];
+                List<FetchedVariable> returnValue = [];
 
                 foreach (StackElementInformation item in scope.Stack)
                 {
-                    Range<int> address = item.GetRange(Processor.Registers.BasePointer, Processor.StackStart);
-                    Variable variable = ToVariable(address, item.Type, memory, item.Identifier, ref CurrentUniqueIds);
-                    variable.EvaluateName = item.Identifier;
-
                     (item.Kind switch
                     {
                         StackElementKind.Internal => item.Identifier == "Return Value" ? returnValue : internals,
                         StackElementKind.Variable => locals,
                         StackElementKind.Parameter => arguments,
                         _ => throw new UnreachableException(),
-                    }).Add((variable, CurrentUniqueIds.Next(), item));
+                    }).Add(new FetchedVariable(item));
                 }
-
-                /*
-                if (internals.Count > 0)
-                {
-                    frameScopes.Add((new Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope()
-                    {
-                        Line = LineToClient(scope.Location.Location.Position.Range.Start.Line),
-                        EndLine = LineToClient(scope.Location.Location.Position.Range.End.Line),
-                        Column = ColumnToClient(scope.Location.Location.Position.Range.Start.Character),
-                        EndColumn = ColumnToClient(scope.Location.Location.Position.Range.End.Character),
-                        NamedVariables = internals.Count,
-                        Name = "Internals",
-                        Source = new Source()
-                        {
-                            Path = scope.Location.Location.File.ToString(),
-                            Name = Path.GetFileName(scope.Location.Location.File.ToString()),
-                        },
-                        VariablesReference = ids.Next(),
-                    }, internals));
-                }
-                */
 
                 if (arguments.Count > 0)
                 {
-                    frameScopes.Add((new Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope()
-                    {
-                        Line = LineToClient(scope.Location.Location.Position.Range.Start.Line),
-                        EndLine = LineToClient(scope.Location.Location.Position.Range.End.Line),
-                        Column = ColumnToClient(scope.Location.Location.Position.Range.Start.Character),
-                        EndColumn = ColumnToClient(scope.Location.Location.Position.Range.End.Character),
-                        NamedVariables = arguments.Count,
-                        Name = "Arguments",
-                        PresentationHint = Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope.PresentationHintValue.Arguments,
-                        Source = new Source()
-                        {
-                            Path = scope.Location.Location.File.ToString(),
-                            Name = Path.GetFileName(scope.Location.Location.File.ToString()),
-                        },
-                        VariablesReference = CurrentUniqueIds.Next(),
-                    }, arguments));
+                    int id = CurrentUniqueIds.Next();
+                    frameScopes.Add(new FetchedScope(
+                        id,
+                        FetchedScopeKind.Arguments,
+                        [.. arguments],
+                        scope
+                    ));
                 }
 
                 if (locals.Count > 0)
                 {
-                    frameScopes.Add((new Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope()
-                    {
-                        Line = LineToClient(scope.Location.Location.Position.Range.Start.Line),
-                        EndLine = LineToClient(scope.Location.Location.Position.Range.End.Line),
-                        Column = ColumnToClient(scope.Location.Location.Position.Range.Start.Character),
-                        EndColumn = ColumnToClient(scope.Location.Location.Position.Range.End.Character),
-                        NamedVariables = locals.Count,
-                        Name = "Locals",
-                        PresentationHint = Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope.PresentationHintValue.Locals,
-                        Source = new Source()
-                        {
-                            Path = scope.Location.Location.File.ToString(),
-                            Name = Path.GetFileName(scope.Location.Location.File.ToString()),
-                        },
-                        VariablesReference = CurrentUniqueIds.Next(),
-                    }, locals));
+                    int id = CurrentUniqueIds.Next();
+                    frameScopes.Add(new FetchedScope(
+                        id,
+                        FetchedScopeKind.Locals,
+                        [.. locals],
+                        scope
+                    ));
                 }
 
                 if (returnValue.Count > 0)
                 {
-                    frameScopes.Add((new Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope()
-                    {
-                        Line = LineToClient(scope.Location.Location.Position.Range.Start.Line),
-                        EndLine = LineToClient(scope.Location.Location.Position.Range.End.Line),
-                        Column = ColumnToClient(scope.Location.Location.Position.Range.Start.Character),
-                        EndColumn = ColumnToClient(scope.Location.Location.Position.Range.End.Character),
-                        NamedVariables = returnValue.Count,
-                        Name = "Return Value",
-                        PresentationHint = Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope.PresentationHintValue.ReturnValue,
-                        Source = new Source()
-                        {
-                            Path = scope.Location.Location.File.ToString(),
-                            Name = Path.GetFileName(scope.Location.Location.File.ToString()),
-                        },
-                        VariablesReference = CurrentUniqueIds.Next(),
-                    }, returnValue));
+                    int id = CurrentUniqueIds.Next();
+                    frameScopes.Add(new FetchedScope(
+                        id,
+                        FetchedScopeKind.ReturnValue,
+                        [.. returnValue],
+                        scope
+                    ));
                 }
             }
 
-            StackFrames.Add((stackFrame, frameScopes));
+            StackFrames.Add(new FetchedFrame(
+                frameId,
+                frame,
+                f,
+                _scopes,
+                [.. frameScopes]
+            ));
         }
     }
 

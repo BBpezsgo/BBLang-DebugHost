@@ -1,5 +1,7 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
+using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
@@ -14,22 +16,19 @@ partial class BytecodeDebugAdapter
 
         using (SyncLock.EnterScope())
         {
-            foreach (var frame in StackFrames)
+            foreach (FetchedFrame frame in StackFrames)
             {
-                foreach (var scope in frame.Scopes)
+                foreach (FetchedScope scope in frame.Scopes)
                 {
-                    if (scope.Scope.VariablesReference != arguments.VariablesReference) continue;
-                    List<Variable> variables = [];
-                    int start = arguments.Start ?? 0;
-                    int count = arguments.Count ?? (scope.Variables.Count - start);
-                    for (int i = 0; i < count; i++)
+                    if (scope.Id != arguments.VariablesReference) continue;
+
+                    List<Variable> result = [];
+                    foreach (FetchedVariable variable in scope.Variables.Slice(arguments.Start, arguments.Count))
                     {
-                        int j = i + start;
-                        if (j < 0) break;
-                        if (j >= scope.Variables.Count) continue;
-                        variables.Add(scope.Variables[j].Variable);
+                        Range<int> address = variable.Value.GetRange(Processor.Registers.BasePointer, Processor.StackStart);
+                        result.Add(ToVariable(address, variable.Value.Type, Processor.Memory, variable.Value.Identifier, ref CurrentUniqueIds));
                     }
-                    return new VariablesResponse(variables);
+                    return new VariablesResponse(result);
                 }
             }
 
@@ -41,8 +40,13 @@ partial class BytecodeDebugAdapter
                 {
                     case BuiltinType:
                     case PointerType:
-                    case FunctionType:
                     {
+                        result.Add(ToVariable(indirectVariable.Address, indirectVariable.Type, Processor.Memory, $"*{indirectVariable.ParentName}", ref CurrentUniqueIds));
+                        break;
+                    }
+                    case FunctionType v:
+                    {
+                        if (!v.HasClosure) throw new UnreachableException();
                         result.Add(ToVariable(indirectVariable.Address, indirectVariable.Type, Processor.Memory, $"*{indirectVariable.ParentName}", ref CurrentUniqueIds));
                         break;
                     }
