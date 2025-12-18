@@ -8,7 +8,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleStepInRequest");
 
-        Continue(step: true);
+        Continue(StopReason_StepIn.Instance);
         return new StepInResponse();
     }
 }

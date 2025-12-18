@@ -2,25 +2,25 @@ namespace DebugServer;
 
 partial class BytecodeDebugAdapter
 {
-    void Continue(bool step)
+    void Continue(StopReason? step)
     {
         using (SyncLock.EnterScope())
         {
-            if (step)
+            if (step is not null)
             {
-                RequestStop(StopReason_StepForward.Instance);
+                RequestStop(step);
             }
             else
             {
                 StopReason = null;
                 ShouldStop = false;
-                Log.WriteLine($"STOP REASON NULL");
+                //Log.WriteLine($"STOP REASON NULL");
             }
         }
 
         if (AllowProceedEvent.Set())
         {
-            Log.WriteLine($"CONTINUE PROCEED");
+            //Log.WriteLine($"CONTINUE PROCEED");
         }
         else
         {
@@ -55,16 +55,15 @@ partial class BytecodeDebugAdapter
     {
         StopReason = reason;
         ShouldStop = true;
-        Log.WriteLine($"STOP REASON {reason}");
+        //Log.WriteLine($"STOP REASON {reason}");
 
         if (AllowProceedEvent.Reset())
         {
-            Log.WriteLine($"CONTINUE BLOCK");
+            //Log.WriteLine($"CONTINUE BLOCK");
         }
         else
         {
             Log.WriteLine($"CONTINUE BLOCK failed");
         }
     }
-
 }

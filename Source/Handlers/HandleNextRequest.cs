@@ -8,7 +8,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleNextRequest");
 
-        Continue(step: true);
+        Continue(StopReason_StepForward.Instance);
         return new NextResponse();
     }
 }

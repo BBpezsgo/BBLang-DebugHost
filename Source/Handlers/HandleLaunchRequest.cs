@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
@@ -31,12 +32,9 @@ partial class BytecodeDebugAdapter
             throw new ProtocolException("Launch failed because 'program' files does not exist.");
         }
 
-        Breakpoints.Clear();
+        Reset();
 
         VirtualIO io = new();
-        StdOut.Clear();
-        StdOutModifiedAt = 0;
-        Time = 0;
         List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(io);
         io.OnStdOut += WriteStdout;
 
@@ -47,7 +45,11 @@ partial class BytecodeDebugAdapter
         {
             StringBuilder b = new();
             diagnostics.WriteErrorsTo(b);
-            SendOutput(b.ToString());
+            Protocol.SendEvent(new OutputEvent()
+            {
+                Output = b.ToString(),
+                Severity = OutputEvent.SeverityValue.Error,
+            });
         }
         diagnostics.Clear();
 
@@ -62,18 +64,26 @@ partial class BytecodeDebugAdapter
                     ExtraDirectories = config.ExtraDirectories,
                 },
             ],
+            Optimizations = OptimizationSettings.None,
         }, diagnostics);
         if (diagnostics.HasErrors)
         {
             StringBuilder b = new();
             diagnostics.WriteErrorsTo(b);
-            SendOutput(b.ToString());
+            Protocol.SendEvent(new OutputEvent()
+            {
+                Output = b.ToString(),
+                Severity = OutputEvent.SeverityValue.Error,
+            });
             Protocol.SendEvent(new ExitedEvent() { ExitCode = -1 });
             Protocol.SendEvent(new TerminatedEvent());
             return new LaunchResponse();
         }
 
-        Generated = CodeGeneratorForMain.Generate(Compiled, MainGeneratorSettings.Default, null, diagnostics);
+        Generated = CodeGeneratorForMain.Generate(Compiled, new MainGeneratorSettings(MainGeneratorSettings.Default)
+        {
+            Optimizations = GeneratorOptimizationSettings.None,
+        }, null, diagnostics);
         if (diagnostics.HasErrors)
         {
             Protocol.SendEvent(new ExitedEvent() { ExitCode = -1 });
@@ -81,23 +91,28 @@ partial class BytecodeDebugAdapter
             return new LaunchResponse();
         }
 
-        Processor = new BytecodeProcessor(BytecodeInterpreterSettings.Default, Generated.Code, null, Generated.DebugInfo, Compiled.ExternalFunctions, Generated.GeneratedUnmanagedFunctions);
+        Processor = new BytecodeProcessor(
+            BytecodeInterpreterSettings.Default,
+            Generated.Code,
+            null,
+            Generated.DebugInfo,
+            Compiled.ExternalFunctions,
+            Generated.GeneratedUnmanagedFunctions
+        );
 
-        RequestStop(StopReason_Pause.Instance);
-        //if (arguments.ConfigurationProperties.GetValueAsBool("stopAtEntry") ?? false)
-        //{
-        //    RequestStop(PauseStopReason.Instance);
-        //}
-        //else
-        //{
-        //    stopReason = null;
-        //}
+        if (arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false)
+        {
+            RequestStop(StopReason_Pause.Instance);
+        }
+        else
+        {
+            StopReason = null;
+        }
 
         RuntimeThread = new(DebugThreadProc)
         {
-            Name = "Debug Loop Thread"
+            Name = "Runtime Thread"
         };
-        RuntimeThread.Start();
 
         return new LaunchResponse();
     }

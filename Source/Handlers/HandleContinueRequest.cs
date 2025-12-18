@@ -8,7 +8,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleContinueRequest");
 
-        Continue(step: false);
+        Continue(null);
         return new ContinueResponse();
     }
 }

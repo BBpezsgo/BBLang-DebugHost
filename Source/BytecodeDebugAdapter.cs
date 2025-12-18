@@ -27,11 +27,10 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
     BBLangGeneratorResult Generated;
     BytecodeProcessor? Processor;
 
-    readonly List<Breakpoint> UnverifiedBreakpoints = [];
-    readonly List<Breakpoint> InvalidBreakpoints = [];
-    readonly List<(Breakpoint Breakpoint, int Instruction)> Breakpoints = [];
+    readonly Dictionary<Uri, List<Breakpoint>> InvalidBreakpoints = [];
+    readonly Dictionary<Uri, List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)>> Breakpoints = [];
 
-    readonly List<(StackFrame Frame, List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id)> Variables)> Scopes)> StackFrames = [];
+    readonly List<(StackFrame Frame, List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id, StackElementInformation StackItem)> Variables)> Scopes)> StackFrames = [];
     readonly List<(GeneralType Type, int Id, int Address, string ParentName)> IndirectVariables = [];
     UniqueIds CurrentUniqueIds;
 
@@ -41,6 +40,31 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         DidProceedEvent = new ManualResetEvent(false);
         InitializeProtocolClient(stdIn, stdOut);
         Log = log;
+    }
+
+    void Reset()
+    {
+        Compiled = default;
+        Generated = default;
+        Processor = null;
+        InvalidBreakpoints.Clear();
+        Breakpoints.Clear();
+        StackFrames.Clear();
+        IndirectVariables.Clear();
+        IsDisconnected = false;
+        IsStopped = false;
+        LastStopContext = null;
+        ShouldStop = false;
+        StopReason = null;
+        CrashReason = null;
+        Time = 0;
+        AllowProceedEvent.Set();
+        DidProceedEvent.Reset();
+        StdOut.Clear();
+        StdOutCommonTraceItem = null;
+        StdOutModifiedAt = 0;
+        RuntimeThread?.Join();
+        RuntimeThread = null;
     }
 
     Variable ToVariable(int address, GeneralType type, ReadOnlySpan<byte> memory, string name, ref UniqueIds ids)
@@ -106,16 +130,17 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                     if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
                     {
                         variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
+                        variable.Value = "[...]";
                     }
                     else
                     {
-                        variable.Value = "[ ? ]";
+                        variable.Value = "[?]";
                     }
                     break;
                 }
                 case StructType v:
                 {
-                    variable.Value = "{ ... }";
+                    variable.Value = "{...}";
                     variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
                     break;
                 }
@@ -187,42 +212,57 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             {
                 stackFrame = new StackFrame()
                 {
+                    Id = frameId,
+                    Name = functionName ?? $"<{frame.InstructionPointer}>",
                     Line = LineToClient(location.Location.Position.Range.Start.Line),
                     EndLine = LineToClient(location.Location.Position.Range.End.Line),
                     Column = LineToClient(location.Location.Position.Range.Start.Character),
                     EndColumn = LineToClient(location.Location.Position.Range.End.Character),
-                    Name = functionName ?? $"<{frame.InstructionPointer}>",
                     Source = new Source()
                     {
                         Name = Path.GetFileName(location.Location.File.ToString()),
                         Path = location.Location.File.ToString(),
                     },
+                };
+            }
+            else if (f.IsValid && f.File is not null)
+            {
+                stackFrame = new StackFrame()
+                {
                     Id = frameId,
+                    Name = functionName ?? $"<{frame.InstructionPointer}>",
+                    Line = LineToClient(f.SourcePosition.Range.Start.Line),
+                    EndLine = LineToClient(f.SourcePosition.Range.End.Line),
+                    Column = LineToClient(f.SourcePosition.Range.Start.Character),
+                    EndColumn = LineToClient(f.SourcePosition.Range.End.Character),
+                    Source = f.File is null ? null : new Source()
+                    {
+                        Name = Path.GetFileName(f.File.ToString()),
+                        Path = f.File.ToString(),
+                    },
                 };
             }
             else
             {
                 stackFrame = new StackFrame()
                 {
-                    Name = functionName ?? $"<{frame.InstructionPointer}>",
                     Id = frameId,
+                    Name = functionName ?? $"<{frame.InstructionPointer}>",
                 };
             }
 
-            List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id)> Variables)> frameScopes = [];
+            List<(Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.Scope Scope, List<(Variable Variable, int Id, StackElementInformation StackItem)> Variables)> frameScopes = [];
             ImmutableArray<ScopeInformation> _scopes = Processor.DebugInformation.GetScopes(frame.InstructionPointer);
 
             foreach (ScopeInformation scope in _scopes)
             {
-                List<(Variable Variable, int Id)> locals = [];
-                List<(Variable Variable, int Id)> arguments = [];
-                List<(Variable Variable, int Id)> internals = [];
-                List<(Variable Variable, int Id)> returnValue = [];
+                List<(Variable Variable, int Id, StackElementInformation StackItem)> locals = [];
+                List<(Variable Variable, int Id, StackElementInformation StackItem)> arguments = [];
+                List<(Variable Variable, int Id, StackElementInformation StackItem)> internals = [];
+                List<(Variable Variable, int Id, StackElementInformation StackItem)> returnValue = [];
 
                 foreach (StackElementInformation item in scope.Stack)
                 {
-                    Log.WriteLine(item.Identifier);
-
                     Range<int> address = item.GetRange(Processor.Registers.BasePointer, Processor.StackStart);
                     Variable variable = ToVariable(address, item.Type, memory, item.Identifier, ref CurrentUniqueIds);
                     variable.EvaluateName = item.Identifier;
@@ -233,7 +273,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                         StackElementKind.Variable => locals,
                         StackElementKind.Parameter => arguments,
                         _ => throw new UnreachableException(),
-                    }).Add((variable, CurrentUniqueIds.Next()));
+                    }).Add((variable, CurrentUniqueIds.Next(), item));
                 }
 
                 /*
@@ -326,75 +366,6 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         path.Contains("//:")
         ? new Uri(path)
         : new Uri($"file://{path}");
-
-    void TrySetBreakpoints()
-    {
-        void _(List<Breakpoint> pending)
-        {
-            if (Processor is null) return;
-
-            for (int i = 0; i < pending.Count; i++)
-            {
-                Breakpoint breakpoint = pending[i];
-
-                if (!breakpoint.Line.HasValue)
-                {
-                    pending.RemoveAt(i--);
-                    Protocol.SendEvent(new BreakpointEvent()
-                    {
-                        Breakpoint = breakpoint,
-                        Reason = BreakpointEvent.ReasonValue.Removed,
-                    });
-                    continue;
-                }
-
-                SinglePosition pos = new(LineFromClient(breakpoint.Line.Value), ColumnFromClient(breakpoint.Column ?? clientsFirstColumn));
-                Range<int> selectedInstructions = default;
-
-                foreach (SourceCodeLocation item in Processor.DebugInformation.SourceCodeLocations)
-                {
-                    if (item.Location.File != ToUri(breakpoint.Source.Path)) continue;
-                    if (!item.Location.Position.Range.Contains(pos)) continue;
-                    if (selectedInstructions == 0 || item.Instructions.Size() < selectedInstructions.Size())
-                    {
-                        selectedInstructions = item.Instructions;
-                    }
-                }
-
-                if (selectedInstructions == 0)
-                {
-                    if (pending != InvalidBreakpoints)
-                    {
-                        breakpoint.Message = $"Invalid location";
-                        breakpoint.Verified = false;
-                        breakpoint.Reason = Breakpoint.ReasonValue.Failed;
-                        Protocol.SendEvent(new BreakpointEvent()
-                        {
-                            Breakpoint = breakpoint,
-                            Reason = BreakpointEvent.ReasonValue.Changed,
-                        });
-                        pending.RemoveAt(i--);
-                        InvalidBreakpoints.Add(breakpoint);
-                    }
-                    continue;
-                }
-
-                breakpoint.Message = null;
-                breakpoint.Verified = true;
-
-                Breakpoints.Add((breakpoint, selectedInstructions.Start));
-                pending.RemoveAt(i--);
-
-                Protocol.SendEvent(new BreakpointEvent()
-                {
-                    Breakpoint = breakpoint,
-                    Reason = BreakpointEvent.ReasonValue.Changed,
-                });
-            }
-        }
-
-        _(UnverifiedBreakpoints);
-    }
 
     int clientsFirstLine;
     int clientsFirstColumn;

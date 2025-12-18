@@ -1,11 +1,20 @@
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Threading;
-using LanguageCore;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using SysThread = System.Threading.Thread;
 
 namespace DebugServer;
+
+class StopContext
+{
+    public required int CodePointer;
+    public required ImmutableArray<CallTraceItem> StackTrace;
+    public required FunctionInformation Function;
+    public required SourceCodeLocation Location;
+}
 
 partial class BytecodeDebugAdapter
 {
@@ -14,8 +23,7 @@ partial class BytecodeDebugAdapter
     readonly ManualResetEvent DidProceedEvent;
     bool IsDisconnected;
     bool IsStopped;
-    Location StopLocation;
-    int StopBasePointer;
+    StopContext? LastStopContext;
     bool ShouldStop;
     StopReason? StopReason;
     RuntimeException? CrashReason;
@@ -35,35 +43,50 @@ partial class BytecodeDebugAdapter
 
         bool crashed = false;
 
-        while (Processor is not null && !IsDisconnected && (!Processor.IsDone || ShouldStop))
+        while (Processor is not null && !IsDisconnected && (!Processor.IsDone || (ShouldStop && StopReason is StopReason_Crash)))
         {
             if (ShouldStop)
             {
                 using (SyncLock.EnterScope())
                 {
-                    if (Processor.DebugInformation.TryGetSourceLocation(Processor.Registers.CodePointer, out SourceCodeLocation sourceLocation))
-                    {
-                        //log.WriteLine($"{sourceLocation.Location} == {stopLocation}");
-                        if (sourceLocation.Location == StopLocation)
-                        {
-                            goto _procceed;
-                        }
+                    List<CallTraceItem> stacktrace = [];
+                    DebugUtils.TraceStack(Processor.Memory, Processor.Registers.BasePointer, Processor.DebugInformation.StackOffsets, stacktrace);
 
-                        if (StopReason is StopReason_StepForward && StopLocation.Position.Range.Start.Line == sourceLocation.Location.Position.Range.Start.Line)
-                        {
-                            goto _procceed;
-                        }
-                    }
-
-                    if (StopReason is StopReason_StepOut && StopBasePointer == Processor.Registers.BasePointer)
+                    if (!Processor.DebugInformation.TryGetSourceLocation(Processor.Registers.CodePointer, out SourceCodeLocation sourceLocation))
                     {
                         goto _procceed;
+                    }
+
+                    FunctionInformation function = Processor.DebugInformation.GetFunctionInformation(Processor.Registers.CodePointer);
+
+                    if (LastStopContext is not null)
+                    {
+                        if (sourceLocation.Location == LastStopContext.Location.Location)
+                        {
+                            goto _procceed;
+                        }
+
+                        if (StopReason is StopReason_StepForward && stacktrace.Count > LastStopContext.StackTrace.Length)
+                        {
+                            goto _procceed;
+                        }
+
+                        if (StopReason is StopReason_StepOut && stacktrace.Count >= LastStopContext.StackTrace.Length)
+                        {
+                            goto _procceed;
+                        }
                     }
 
                     Log.WriteLine("[#] Stopped");
                     GatherInformation();
                     IsStopped = true;
-                    StopLocation = sourceLocation.Location;
+                    LastStopContext = new StopContext()
+                    {
+                        CodePointer = Processor.Registers.CodePointer,
+                        Function = function,
+                        Location = sourceLocation,
+                        StackTrace = [.. stacktrace],
+                    };
 
                     switch (StopReason)
                     {
@@ -146,19 +169,24 @@ partial class BytecodeDebugAdapter
                 continue;
             }
 
-            if (StopReason is StopReason_StepForward or StopReason_StepIn or StopReason_StepOut)
+            if (!Processor.IsDone && StopReason is StopReason_StepForward or StopReason_StepIn or StopReason_StepOut)
             {
-                RequestStopUnsafe(StopReason_StepForward.Instance);
+                RequestStopUnsafe(StopReason);
             }
 
-            foreach ((Breakpoint breakpoint, int instruction) in Breakpoints)
+            foreach (List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> bps in Breakpoints.Values)
             {
-                if (instruction != Processor.Registers.CodePointer) continue;
-
-                RequestStopUnsafe(new StopReason_Breakpoint()
+                foreach ((Breakpoint breakpoint, int instruction, SourceBreakpoint sourceBreakpoint) in bps)
                 {
-                    Breakpoint = breakpoint,
-                });
+                    if (instruction != Processor.Registers.CodePointer) continue;
+
+                    Log.WriteLine($"BREAKPOINT HIT {sourceBreakpoint.Line}:{sourceBreakpoint.Column} at {instruction} in {breakpoint.Source.Name}");
+
+                    RequestStopUnsafe(new StopReason_Breakpoint()
+                    {
+                        Breakpoint = breakpoint,
+                    });
+                }
             }
 
             if (StdOutModifiedAt != 0 && Time - StdOutModifiedAt > 30)
@@ -174,6 +202,10 @@ partial class BytecodeDebugAdapter
         {
             FlushStdout();
             Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
+            Protocol.SendEvent(new TerminatedEvent());
+        }
+        else
+        {
             Protocol.SendEvent(new TerminatedEvent());
         }
 

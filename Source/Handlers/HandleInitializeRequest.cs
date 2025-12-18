@@ -11,6 +11,8 @@ partial class BytecodeDebugAdapter
         if (arguments.LinesStartAt1 == true) clientsFirstLine = 1;
         if (arguments.ColumnsStartAt1 == true) clientsFirstColumn = 1;
 
+        Protocol.SendEvent(new InitializedEvent());
+
         return new InitializeResponse()
         {
             SupportsConfigurationDoneRequest = true,

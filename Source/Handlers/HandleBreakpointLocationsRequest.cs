@@ -11,35 +11,23 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleBreakpointLocationsRequest");
 
-        UnverifiedBreakpoints.Add(new Breakpoint()
-        {
-            Source = arguments.Source,
-            Line = arguments.Line,
-            Column = arguments.Column,
-            EndColumn = arguments.EndColumn,
-            EndLine = arguments.EndLine,
-            Verified = false,
-            Id = BreakpointIds.Next(),
-        });
-
         if (Processor is null) return new BreakpointLocationsResponse();
 
-        TrySetBreakpoints();
-
         List<BreakpointLocation> result = [];
-        for (int i = 0; i < Breakpoints.Count; i++)
+        HashSet<SinglePosition> set = [];
+        foreach (SourceCodeLocation item in Processor.DebugInformation.SourceCodeLocations)
         {
-            if (!Processor.DebugInformation.TryGetSourceLocation(Breakpoints[i].Instruction, out SourceCodeLocation location)) continue;
-            if (location.Location.File != ToUri(arguments.Source.Path)) continue;
-
+            if (item.Location.File != ToUri(arguments.Source.Path)) continue;
+            if (item.Location.Position.Range.Start.Line != LineFromClient(arguments.Line)) continue;
+            if (!set.Add(item.Location.Position.Range.Start)) continue;
             result.Add(new BreakpointLocation()
             {
-                Column = ColumnToClient(location.Location.Position.Range.Start.Character),
-                EndColumn = ColumnToClient(location.Location.Position.Range.End.Character),
-                Line = LineToClient(location.Location.Position.Range.Start.Line),
-                EndLine = LineToClient(location.Location.Position.Range.End.Line),
+                Line = LineToClient(item.Location.Position.Range.Start.Line),
+                EndLine = LineToClient(item.Location.Position.Range.End.Line),
+                Column = LineToClient(item.Location.Position.Range.Start.Character),
+                EndColumn = LineToClient(item.Location.Position.Range.End.Character),
             });
         }
-        return new BreakpointLocationsResponse();
+        return new BreakpointLocationsResponse(result);
     }
 }

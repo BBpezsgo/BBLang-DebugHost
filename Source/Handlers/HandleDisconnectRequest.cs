@@ -8,10 +8,10 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleDisconnectRequest");
 
-        Continue(step: false);
-        RuntimeThread?.Join();
-
         IsDisconnected = true;
+
+        Continue(null);
+        RuntimeThread?.Join();
 
         return new DisconnectResponse();
     }
