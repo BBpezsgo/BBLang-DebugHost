@@ -8,6 +8,8 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleStepOutRequest");
 
+        if (NoDebug) return new StepOutResponse();
+
         Continue(StopReason_StepOut.Instance);
         return new StepOutResponse();
     }

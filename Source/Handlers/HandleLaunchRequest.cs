@@ -34,6 +34,8 @@ partial class BytecodeDebugAdapter
 
         Reset();
 
+        NoDebug = arguments.ConfigurationProperties.GetValueAsBool("noDebug") ?? false;
+
         VirtualIO io = new();
         List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(io);
         io.OnStdOut += WriteStdout;
@@ -100,7 +102,7 @@ partial class BytecodeDebugAdapter
             Generated.GeneratedUnmanagedFunctions
         );
 
-        if (arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false)
+        if (!NoDebug && (arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false))
         {
             RequestStop(StopReason_Pause.Instance);
         }
@@ -109,7 +111,7 @@ partial class BytecodeDebugAdapter
             StopReason = null;
         }
 
-        RuntimeThread = new(DebugThreadProc)
+        RuntimeThread = new(NoDebug ? RuntimeImplNoDebug : RuntimeImpl)
         {
             Name = "Runtime Thread"
         };

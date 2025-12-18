@@ -8,6 +8,8 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleNextRequest");
 
+        if (NoDebug) return new NextResponse();
+
         Continue(StopReason_StepForward.Instance);
         return new NextResponse();
     }

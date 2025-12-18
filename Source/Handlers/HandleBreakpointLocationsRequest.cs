@@ -11,7 +11,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleBreakpointLocationsRequest");
 
-        if (Processor is null) return new BreakpointLocationsResponse();
+        if (Processor is null || NoDebug) return new BreakpointLocationsResponse();
 
         List<BreakpointLocation> result = [];
         HashSet<SinglePosition> set = [];

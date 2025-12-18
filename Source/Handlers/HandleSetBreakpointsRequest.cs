@@ -60,7 +60,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleSetBreakpointsRequest");
 
-        if (Processor is null) return new SetBreakpointsResponse([]);
+        if (Processor is null || NoDebug) return new SetBreakpointsResponse([]);
 
         List<Breakpoint> result = [];
 

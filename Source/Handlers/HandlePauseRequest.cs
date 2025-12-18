@@ -8,6 +8,8 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandlePauseRequest");
 
+        if (NoDebug) return new PauseResponse();
+
         RequestStop(StopReason_Pause.Instance);
         return new PauseResponse();
     }

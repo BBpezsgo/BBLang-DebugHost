@@ -65,6 +65,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         StdOutModifiedAt = 0;
         RuntimeThread?.Join();
         RuntimeThread = null;
+        NoDebug = false;
     }
 
     Variable ToVariable(int address, GeneralType type, ReadOnlySpan<byte> memory, string name, ref UniqueIds ids)

@@ -28,8 +28,9 @@ partial class BytecodeDebugAdapter
     StopReason? StopReason;
     RuntimeException? CrashReason;
     int Time;
+    bool NoDebug;
 
-    void DebugThreadProc()
+    void RuntimeImpl()
     {
         using (SyncLock.EnterScope())
         {
@@ -201,6 +202,68 @@ partial class BytecodeDebugAdapter
         if (!IsDisconnected)
         {
             FlushStdout();
+            Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
+            Protocol.SendEvent(new TerminatedEvent());
+        }
+        else
+        {
+            Protocol.SendEvent(new TerminatedEvent());
+        }
+
+        Processor = null;
+
+        Log.WriteLine("[#] Exited");
+    }
+
+    void RuntimeImplNoDebug()
+    {
+        using (SyncLock.EnterScope())
+        {
+            Log.WriteLine("[#] Started");
+            Protocol.SendEvent(new ContinuedEvent()
+            {
+                ThreadId = 1,
+                AllThreadsContinued = true,
+            });
+        }
+
+        bool crashed = false;
+
+        while (Processor is not null && !IsDisconnected && !Processor.IsDone)
+        {
+            if (crashed) break;
+
+            try
+            {
+                Processor.Tick();
+            }
+            catch (RuntimeException ex)
+            {
+                crashed = true;
+                CrashReason = ex;
+                break;
+            }
+
+            if (StdOutModifiedAt != 0 && Time - StdOutModifiedAt > 30)
+            {
+                FlushStdout();
+                StdOutModifiedAt = 0;
+            }
+
+            SysThread.Yield();
+        }
+
+        if (!IsDisconnected)
+        {
+            FlushStdout();
+            if (crashed && CrashReason is not null)
+            {
+                Protocol.SendEvent(new OutputEvent()
+                {
+                    Output = CrashReason.ToString(),
+                    Severity = OutputEvent.SeverityValue.Error,
+                });
+            }
             Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
             Protocol.SendEvent(new TerminatedEvent());
         }
