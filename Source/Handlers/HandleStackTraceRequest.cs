@@ -19,13 +19,14 @@ partial class BytecodeDebugAdapter
             List<StackFrame> result = [];
             foreach (FetchedFrame frame in StackFrames)
             {
-                string? functionName = frame.Function.IsValid ? (frame.Function.Identifier ?? frame.Function.Function?.ToReadable(frame.Function.TypeArguments) ?? "<unknown function>") : $"<{frame.Raw.InstructionPointer}>";
+                string functionName = frame.Function.ReadableIdentifier() ?? $"<{frame.Raw.InstructionPointer}>";
+
                 if (Processor.DebugInformation.TryGetSourceLocation(frame.Raw.InstructionPointer, out SourceCodeLocation location))
                 {
                     result.Add(new StackFrame()
                     {
                         Id = frame.Id,
-                        Name = functionName ?? $"<{frame.Raw.InstructionPointer}>",
+                        Name = functionName,
                         Line = LineToClient(location.Location.Position.Range.Start.Line),
                         EndLine = LineToClient(location.Location.Position.Range.End.Line),
                         Column = LineToClient(location.Location.Position.Range.Start.Character),
@@ -43,7 +44,7 @@ partial class BytecodeDebugAdapter
                     result.Add(new StackFrame()
                     {
                         Id = frame.Id,
-                        Name = functionName ?? $"<{frame.Raw.InstructionPointer}>",
+                        Name = functionName,
                         Line = LineToClient(frame.Function.SourcePosition.Range.Start.Line),
                         EndLine = LineToClient(frame.Function.SourcePosition.Range.End.Line),
                         Column = LineToClient(frame.Function.SourcePosition.Range.Start.Character),
@@ -61,7 +62,7 @@ partial class BytecodeDebugAdapter
                     result.Add(new StackFrame()
                     {
                         Id = frame.Id,
-                        Name = functionName ?? $"<{frame.Raw.InstructionPointer}>",
+                        Name = functionName,
                         InstructionPointerReference = frame.Raw.InstructionPointer.ToString(),
                     });
                 }

@@ -34,7 +34,7 @@ partial class BytecodeDebugAdapter
 
         DisposeSession();
 
-        NoDebug = arguments.ConfigurationProperties.GetValueAsBool("noDebug") ?? false;
+        NoDebug = arguments.NoDebug ?? false;
         StopOnEntry = arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false;
 
         VirtualIO io = new();
@@ -112,7 +112,7 @@ partial class BytecodeDebugAdapter
             StopReason = null;
         }
 
-        RuntimeThread = new(NoDebug ? RuntimeImplNoDebug : RuntimeImpl)
+        RuntimeThread = new(RuntimeImpl)
         {
             Name = "Runtime Thread"
         };

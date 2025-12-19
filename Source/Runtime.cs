@@ -25,6 +25,7 @@ partial class BytecodeDebugAdapter
     bool IsStopped;
     StopContext? LastStopContext;
     bool ShouldStop;
+    bool IsRestarting;
     StopReason? StopReason;
     RuntimeException? CrashReason;
     int Time;
@@ -42,8 +43,6 @@ partial class BytecodeDebugAdapter
                 AllThreadsContinued = true,
             });
         }
-
-        bool crashed = false;
 
         while (Processor is not null && !IsDisconnected && (!Processor.IsDone || (ShouldStop && StopReason is StopReason_Crash)))
         {
@@ -137,8 +136,14 @@ partial class BytecodeDebugAdapter
 
                 Log.WriteLine("[#] Waiting to continue ...");
                 AllowProceedEvent.WaitOne();
-                DidProceedEvent.Set();
                 Log.WriteLine("[#] Continued");
+                DidProceedEvent.Set();
+
+                if (IsRestarting)
+                {
+                    Log.WriteLine("[#] Breaking runtime thread (restarting)");
+                    break;
+                }
 
                 using (SyncLock.EnterScope())
                 {
@@ -154,7 +159,7 @@ partial class BytecodeDebugAdapter
             _procceed:;
             }
 
-            if (crashed) break;
+            if (CrashReason is not null) break;
 
             try
             {
@@ -162,13 +167,19 @@ partial class BytecodeDebugAdapter
             }
             catch (RuntimeException ex)
             {
-                RequestStopUnsafe(new StopReason_Crash()
-                {
-                    Exception = ex,
-                });
-                crashed = true;
                 CrashReason = ex;
-                continue;
+                if (NoDebug)
+                {
+                    break;
+                }
+                else
+                {
+                    RequestStopUnsafe(new StopReason_Crash()
+                    {
+                        Exception = ex,
+                    });
+                    continue;
+                }
             }
 
             if (!Processor.IsDone && StopReason is StopReason_StepForward or StopReason_StepIn or StopReason_StepOut)
@@ -176,30 +187,33 @@ partial class BytecodeDebugAdapter
                 RequestStopUnsafe(StopReason);
             }
 
-            foreach ((Breakpoint Breakpoint, InstructionBreakpoint InstructionBreakpoint, int Address) item in InstructionBreakpoints)
+            if (!NoDebug)
             {
-                if (item.Address != Processor.Registers.CodePointer) continue;
-
-                Log.WriteLine($"BREAKPOINT HIT at {item.Address}");
-
-                RequestStopUnsafe(new StopReason_Breakpoint()
+                foreach (var item in InstructionBreakpoints)
                 {
-                    Breakpoint = item.Breakpoint,
-                });
-            }
+                    if (item.Address != Processor.Registers.CodePointer) continue;
 
-            foreach (List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> bps in Breakpoints.Values)
-            {
-                foreach ((Breakpoint breakpoint, int instruction, SourceBreakpoint sourceBreakpoint) in bps)
-                {
-                    if (instruction != Processor.Registers.CodePointer) continue;
-
-                    Log.WriteLine($"BREAKPOINT HIT {sourceBreakpoint.Line}:{sourceBreakpoint.Column} at {instruction} in {breakpoint.Source.Name}");
+                    Log.WriteLine($"BREAKPOINT HIT at {item.Address}");
 
                     RequestStopUnsafe(new StopReason_Breakpoint()
                     {
-                        Breakpoint = breakpoint,
+                        Breakpoint = item.Breakpoint,
                     });
+                }
+
+                foreach (List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> bps in Breakpoints.Values)
+                {
+                    foreach ((Breakpoint breakpoint, int instruction, SourceBreakpoint sourceBreakpoint) in bps)
+                    {
+                        if (instruction != Processor.Registers.CodePointer) continue;
+
+                        Log.WriteLine($"BREAKPOINT HIT {sourceBreakpoint.Line}:{sourceBreakpoint.Column} at {instruction} in {breakpoint.Source.Name}");
+
+                        RequestStopUnsafe(new StopReason_Breakpoint()
+                        {
+                            Breakpoint = breakpoint,
+                        });
+                    }
                 }
             }
 
@@ -215,74 +229,21 @@ partial class BytecodeDebugAdapter
         if (!IsDisconnected)
         {
             FlushStdout();
-            Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
-            Protocol.SendEvent(new TerminatedEvent());
-        }
-        else
-        {
-            Protocol.SendEvent(new TerminatedEvent());
-        }
-
-        Processor = null;
-
-        Log.WriteLine("[#] Exited");
-    }
-
-    void RuntimeImplNoDebug()
-    {
-        using (SyncLock.EnterScope())
-        {
-            Log.WriteLine("[#] Started");
-            Protocol.SendEvent(new ContinuedEvent()
-            {
-                ThreadId = 1,
-                AllThreadsContinued = true,
-            });
-        }
-
-        bool crashed = false;
-
-        while (Processor is not null && !IsDisconnected && !Processor.IsDone)
-        {
-            if (crashed) break;
-
-            try
-            {
-                Processor.Tick();
-            }
-            catch (RuntimeException ex)
-            {
-                crashed = true;
-                CrashReason = ex;
-                break;
-            }
-
-            if (StdOutModifiedAt != 0 && Time - StdOutModifiedAt > 30)
-            {
-                FlushStdout();
-                StdOutModifiedAt = 0;
-            }
-
-            SysThread.Yield();
-        }
-
-        if (!IsDisconnected)
-        {
-            FlushStdout();
-            if (crashed && CrashReason is not null)
+            if (CrashReason is not null)
             {
                 Protocol.SendEvent(new OutputEvent()
                 {
                     Output = CrashReason.ToString(),
+                    Category = OutputEvent.CategoryValue.Exception,
                     Severity = OutputEvent.SeverityValue.Error,
                 });
             }
-            Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
-            Protocol.SendEvent(new TerminatedEvent());
-        }
-        else
-        {
-            Protocol.SendEvent(new TerminatedEvent());
+
+            if (!IsRestarting)
+            {
+                Protocol.SendEvent(new ExitedEvent() { ExitCode = 0 });
+                Protocol.SendEvent(new TerminatedEvent());
+            }
         }
 
         Processor = null;

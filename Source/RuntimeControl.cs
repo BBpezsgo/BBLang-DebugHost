@@ -1,3 +1,5 @@
+using System;
+
 namespace DebugServer;
 
 partial class BytecodeDebugAdapter
@@ -53,6 +55,8 @@ partial class BytecodeDebugAdapter
 
     void RequestStopUnsafe(StopReason reason)
     {
+        if (NoDebug) throw new InvalidOperationException($"Cannot stop the runtime in no-debug mode");
+
         StopReason = reason;
         ShouldStop = true;
         //Log.WriteLine($"STOP REASON {reason}");

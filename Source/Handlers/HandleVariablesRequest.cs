@@ -25,7 +25,7 @@ partial class BytecodeDebugAdapter
                     List<Variable> result = [];
                     foreach (FetchedVariable variable in scope.Variables.Slice(arguments.Start, arguments.Count))
                     {
-                        Range<int> address = variable.Value.GetRange(Processor.Registers.BasePointer, Processor.StackStart);
+                        Range<int> address = variable.Value.GetRange(frame.Raw.BasePointer, Processor.StackStart);
                         result.Add(ToVariable(address, variable.Value.Type, Processor.Memory, variable.Value.Identifier, ref CurrentUniqueIds));
                     }
                     return new VariablesResponse(result);

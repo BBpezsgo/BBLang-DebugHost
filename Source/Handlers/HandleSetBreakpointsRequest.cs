@@ -23,7 +23,7 @@ partial class BytecodeDebugAdapter
             if (item.Location.File != file) continue;
             if (item.Location.Position.Range.Start == pos)
             {
-                Log.WriteLine($" ... {item.Location.Position.ToStringRange()} PERFECT");
+                Log.WriteLine($" ... {item.Location.Position} PERFECT");
                 result = item;
                 didFound = true;
                 break;
@@ -32,7 +32,7 @@ partial class BytecodeDebugAdapter
             if (!item.Location.Position.Range.Contains(pos)) continue;
             if (!didFound || item.Location.Position.AbsoluteRange.Size() < result.Location.Position.AbsoluteRange.Size())
             {
-                Log.WriteLine($" ... {item.Location.Position.ToStringRange()}");
+                Log.WriteLine($" ... {item.Location.Position}");
                 result = item;
                 didFound = true;
             }
@@ -47,7 +47,7 @@ partial class BytecodeDebugAdapter
             if (item.Location.Position.Range.Start.Line != pos.Line) continue;
             if (!didFound || item.Location.Position.Range.Start.Character < result.Location.Position.Range.Start.Character)
             {
-                Log.WriteLine($" ... {item.Location.Position.ToStringRange()}");
+                Log.WriteLine($" ... {item.Location.Position}");
                 result = item;
                 didFound = true;
             }

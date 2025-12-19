@@ -31,7 +31,7 @@ partial class BytecodeDebugAdapter
                     {
                         if (variable.Value.Kind == StackElementKind.Internal) continue;
 
-                        int address = variable.Value.AbsoluteAddress(Processor.Registers.BasePointer, Processor.StackStart);
+                        int address = variable.Value.AbsoluteAddress(item.Raw.BasePointer, Processor.StackStart);
                         ExpressionVariable v = new(variable.Value.Identifier, address, variable.Value.Type);
                         variables.Add(v);
                         Log.WriteLine(v);

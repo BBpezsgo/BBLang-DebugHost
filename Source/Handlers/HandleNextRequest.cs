@@ -1,3 +1,4 @@
+using System;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
 namespace DebugServer;
@@ -8,7 +9,7 @@ partial class BytecodeDebugAdapter
     {
         Log.WriteLine("HandleNextRequest");
 
-        if (NoDebug) return new NextResponse();
+        if (NoDebug) throw new InvalidOperationException($"Cannot handle request Next in no-debug mode");
 
         Continue(StopReason_StepForward.Instance);
         return new NextResponse();

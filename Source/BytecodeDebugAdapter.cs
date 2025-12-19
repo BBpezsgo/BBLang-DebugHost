@@ -97,11 +97,6 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
     void ResetSession()
     {
-        Compiled = default;
-        Generated = default;
-        InvalidBreakpoints.Clear();
-        Breakpoints.Clear();
-        InstructionBreakpoints.Clear();
         StackFrames.Clear();
         IndirectVariables.Clear();
         IsStopped = false;
@@ -115,13 +110,22 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         StdOut.Clear();
         StdOutCommonTraceItem = null;
         StdOutModifiedAt = 0;
+
         RuntimeThread?.Join();
+
         RuntimeThread = null;
+        IsRestarting = false;
+        Processor = null;
     }
 
     void DisposeSession()
     {
         ResetSession();
+        Compiled = default;
+        Generated = default;
+        InvalidBreakpoints.Clear();
+        Breakpoints.Clear();
+        InstructionBreakpoints.Clear();
         Processor = null;
         IsDisconnected = false;
         NoDebug = false;
@@ -182,7 +186,10 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 {
                     int pointerValue = memory.Get<int>(address.Start);
                     variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
-                    variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
+                    if (StatementCompiler.FindSize(v.To, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                    {
+                        variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
+                    }
                     break;
                 }
                 case ArrayType v:
@@ -263,11 +270,11 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             if (frame.InstructionPointer < 0 || frame.InstructionPointer >= Processor.Code.Length) continue;
 
             FunctionInformation f = Processor.DebugInformation.GetFunctionInformation(frame.InstructionPointer);
-            int frameId = CurrentUniqueIds.Next();
-            string? functionName = f.IsValid ? (f.Identifier ?? f.Function?.ToReadable(f.TypeArguments) ?? "<unknown function>") : null;
 
             List<FetchedScope> frameScopes = [];
             ImmutableArray<ScopeInformation> _scopes = Processor.DebugInformation.GetScopes(frame.InstructionPointer);
+
+            if (frame.InstructionPointer == 0 && !f.IsValid && _scopes.IsDefaultOrEmpty) continue;
 
             foreach (ScopeInformation scope in _scopes)
             {
@@ -289,9 +296,8 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
                 if (arguments.Count > 0)
                 {
-                    int id = CurrentUniqueIds.Next();
                     frameScopes.Add(new FetchedScope(
-                        id,
+                        CurrentUniqueIds.Next(),
                         FetchedScopeKind.Arguments,
                         [.. arguments],
                         scope
@@ -300,9 +306,8 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
                 if (locals.Count > 0)
                 {
-                    int id = CurrentUniqueIds.Next();
                     frameScopes.Add(new FetchedScope(
-                        id,
+                        CurrentUniqueIds.Next(),
                         FetchedScopeKind.Locals,
                         [.. locals],
                         scope
@@ -311,9 +316,8 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
                 if (returnValue.Count > 0)
                 {
-                    int id = CurrentUniqueIds.Next();
                     frameScopes.Add(new FetchedScope(
-                        id,
+                        CurrentUniqueIds.Next(),
                         FetchedScopeKind.ReturnValue,
                         [.. returnValue],
                         scope
@@ -322,7 +326,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             }
 
             StackFrames.Add(new FetchedFrame(
-                frameId,
+                CurrentUniqueIds.Next(),
                 frame,
                 f,
                 _scopes,
