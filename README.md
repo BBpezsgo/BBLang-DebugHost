@@ -1,4 +1,4 @@
-# Debugger host for my [programing language](https://github.com/BBpezsgo/Interpreter)
+# Debugger host for my [programing language](https://github.com/BBpezsgo/BBLang)
 
 [![.Net 9.0](https://img.shields.io/badge/.NET-9.0-5C2D91?style=flat-square)](#)
 [![C# 11](https://img.shields.io/badge/C%23-11-239120.svg?style=flat-square)](#)
