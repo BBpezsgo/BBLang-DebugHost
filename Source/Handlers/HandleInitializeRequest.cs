@@ -18,6 +18,7 @@ partial class BytecodeDebugAdapter
             SupportsConfigurationDoneRequest = true,
             SupportsDebuggerProperties = true,
             SupportsBreakpointLocationsRequest = true,
+            SupportsConditionalBreakpoints = true,
             SupportsLoadedSourcesRequest = true,
             SupportsLogPoints = true,
             SupportsCancelRequest = false,
@@ -27,6 +28,8 @@ partial class BytecodeDebugAdapter
             SupportsExceptionInfoRequest = true,
             SupportsRestartRequest = true,
             SupportsInstructionBreakpoints = true,
+            SupportsCompletionsRequest = true,
+            CompletionTriggerCharacters = [ "." ],
         };
     }
 }

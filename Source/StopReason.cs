@@ -33,6 +33,11 @@ class StopReason_StepOut : StopReason
     public static readonly StopReason_StepOut Instance = new();
 }
 
+class StopReason_StepInstruction : StopReason
+{
+    public static readonly StopReason_StepInstruction Instance = new();
+}
+
 class StopReason_Pause : StopReason
 {
     public static readonly StopReason_Pause Instance = new();

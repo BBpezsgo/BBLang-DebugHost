@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics.CodeAnalysis;
 
 static class Utils
 {
@@ -12,4 +14,18 @@ static class Utils
 
     public static ImmutableArray<T> Slice<T>(this ImmutableArray<T> array, int? start, int? length) => array.Slice(FixRange(array.Length, start, length));
     public static ImmutableArray<T> Slice<T>(this ImmutableArray<T> array, (int Start, int Length) range) => array.Slice(range.Start, range.Length);
+
+    public static bool TryFind<T>(this IEnumerable<T> values, Predicate<T> predicate, [NotNullWhen(true)] out T? result) where T : notnull
+    {
+        foreach (T item in values)
+        {
+            if (predicate(item))
+            {
+                result = item;
+                return true;
+            }
+        }
+        result = default;
+        return false;
+    }
 }

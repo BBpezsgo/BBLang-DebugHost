@@ -11,7 +11,7 @@ partial class BytecodeDebugAdapter
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request StepIn in no-debug mode");
 
-        Continue(StopReason_StepIn.Instance);
+        Continue(arguments.Granularity == SteppingGranularity.Instruction ? StopReason_StepInstruction.Instance : StopReason_StepIn.Instance);
         return new StepInResponse();
     }
 }

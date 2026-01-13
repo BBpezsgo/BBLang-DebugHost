@@ -1,27 +1,5 @@
-using System;
 using System.IO;
 using System.Threading;
-
-abstract class Logger : IDisposable
-{
-    public abstract void WriteLine(string? value);
-    public void WriteLine(object? value) => WriteLine(value?.ToString());
-
-    public abstract void Dispose();
-}
-
-class VoidLogger : Logger
-{
-    public override void Dispose()
-    {
-        
-    }
-
-    public override void WriteLine(string? value)
-    {
-        
-    }
-}
 
 class FileLogger : Logger
 {

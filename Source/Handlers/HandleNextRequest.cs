@@ -11,7 +11,7 @@ partial class BytecodeDebugAdapter
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request Next in no-debug mode");
 
-        Continue(StopReason_StepForward.Instance);
+        Continue(arguments.Granularity == SteppingGranularity.Instruction ? StopReason_StepInstruction.Instance : StopReason_StepForward.Instance);
         return new NextResponse();
     }
 }

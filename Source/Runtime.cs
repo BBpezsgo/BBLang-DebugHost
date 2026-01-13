@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Text;
 using System.Threading;
+using LanguageCore;
+using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using SysThread = System.Threading.Thread;
@@ -52,29 +55,32 @@ partial class BytecodeDebugAdapter
                 {
                     List<CallTraceItem> stacktrace = [];
                     DebugUtils.TraceStack(Processor.Memory, Processor.Registers.BasePointer, Processor.DebugInformation.StackOffsets, stacktrace);
-
-                    if (!Processor.DebugInformation.TryGetSourceLocation(Processor.Registers.CodePointer, out SourceCodeLocation sourceLocation))
-                    {
-                        goto _procceed;
-                    }
-
                     FunctionInformation function = Processor.DebugInformation.GetFunctionInformation(Processor.Registers.CodePointer);
+                    SourceCodeLocation sourceLocation = default;
 
-                    if (LastStopContext is not null)
+                    if (StopReason is not StopReason_StepInstruction)
                     {
-                        if (sourceLocation.Location == LastStopContext.Location.Location)
+                        if (!Processor.DebugInformation.TryGetSourceLocation(Processor.Registers.CodePointer, out sourceLocation))
                         {
                             goto _procceed;
                         }
 
-                        if (StopReason is StopReason_StepForward && stacktrace.Count > LastStopContext.StackTrace.Length)
+                        if (LastStopContext is not null)
                         {
-                            goto _procceed;
-                        }
+                            if (sourceLocation.Location == LastStopContext.Location.Location)
+                            {
+                                goto _procceed;
+                            }
 
-                        if (StopReason is StopReason_StepOut && stacktrace.Count >= LastStopContext.StackTrace.Length)
-                        {
-                            goto _procceed;
+                            if (StopReason is StopReason_StepForward && stacktrace.Count > LastStopContext.StackTrace.Length)
+                            {
+                                goto _procceed;
+                            }
+
+                            if (StopReason is StopReason_StepOut && stacktrace.Count >= LastStopContext.StackTrace.Length)
+                            {
+                                goto _procceed;
+                            }
                         }
                     }
 
@@ -97,6 +103,7 @@ partial class BytecodeDebugAdapter
                         case StopReason_StepForward:
                         case StopReason_StepIn:
                         case StopReason_StepOut:
+                        case StopReason_StepInstruction:
                             Protocol.SendEvent(new StoppedEvent()
                             {
                                 Reason = StoppedEvent.ReasonValue.Step,
@@ -201,18 +208,102 @@ partial class BytecodeDebugAdapter
                     });
                 }
 
-                foreach (List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> bps in Breakpoints.Values)
+                foreach (List<CompiledBreakpoint> bps in Breakpoints.Values)
                 {
-                    foreach ((Breakpoint breakpoint, int instruction, SourceBreakpoint sourceBreakpoint) in bps)
+                    foreach (CompiledBreakpoint breakpoint in bps)
                     {
-                        if (instruction != Processor.Registers.CodePointer) continue;
+                        if (breakpoint.Instruction != Processor.Registers.CodePointer) continue;
 
-                        Log.WriteLine($"BREAKPOINT HIT {sourceBreakpoint.Line}:{sourceBreakpoint.Column} at {instruction} in {breakpoint.Source.Name}");
+                        Log.WriteLine($"BREAKPOINT HIT {breakpoint.SourceBreakpoint.Line}:{breakpoint.SourceBreakpoint.Column} at {breakpoint.Instruction} in {breakpoint.Breakpoint.Source.Name}");
 
-                        RequestStopUnsafe(new StopReason_Breakpoint()
+                        using (SyncLock.EnterScope())
                         {
-                            Breakpoint = breakpoint,
-                        });
+                            bool informationGathered = false;
+
+                            if (!string.IsNullOrWhiteSpace(breakpoint.Condition))
+                            {
+                                DiagnosticsCollection diagnostics = new();
+
+                                if (!informationGathered)
+                                {
+                                    GatherInformation();
+                                    informationGathered = true;
+                                }
+
+                                if (TryEvaluate(breakpoint.Condition, StackFrames.Count > 0 ? StackFrames[0].Id : null, diagnostics, out bool result))
+                                {
+                                    if (!result) goto skip;
+                                }
+                                else
+                                {
+                                    StringBuilder b = new();
+                                    b.AppendLine($"Failed to evaluate breakpoint condition `{breakpoint.Condition}` at {breakpoint.SourceBreakpoint.Line}:{breakpoint.SourceBreakpoint.Column} in {breakpoint.Breakpoint.Source.Name}");
+                                    diagnostics.WriteErrorsTo(b);
+                                    Protocol.SendEvent(new OutputEvent()
+                                    {
+                                        Output = b.ToString(),
+                                        Severity = OutputEvent.SeverityValue.Error,
+                                    });
+                                }
+                            }
+
+                            if (!string.IsNullOrWhiteSpace(breakpoint.LogMessage))
+                            {
+                                if (!informationGathered)
+                                {
+                                    GatherInformation();
+                                    informationGathered = true;
+                                }
+
+                                List<ExpressionVariable> variables = StackFrames.Count > 0 ? GetExpressionVariables(StackFrames[0].Id) : [];
+                                string template = breakpoint.LogMessage;
+                                int i = 0;
+                                StringBuilder res = new();
+                                while (i < template.Length)
+                                {
+                                    int j = template.IndexOf('{', i);
+                                    if (j != -1)
+                                    {
+                                        int k = template.IndexOf('}', j);
+                                        if (k != -1)
+                                        {
+                                            res.Append(template[i..j]);
+
+                                            string item = template[(j + 1)..k];
+
+                                            if (variables.TryFind(v => v.Name == item, out ExpressionVariable variable))
+                                            {
+                                                UniqueIds uniqueIds = new();
+                                                res.Append(ToVariable(variable.Address, variable.Type, Processor.Memory, variable.Name, ref uniqueIds).Value);
+                                            }
+
+                                            i = k + 1;
+                                            continue;
+                                        }
+                                    }
+
+                                    res.Append(template[i..]);
+                                    break;
+                                }
+                                res.AppendLine();
+                                Protocol.SendEvent(new OutputEvent()
+                                {
+                                    Output = res.ToString(),
+                                    Category = OutputEvent.CategoryValue.Console,
+                                    Source = breakpoint.Breakpoint.Source,
+                                    Line = breakpoint.SourceBreakpoint.Line,
+                                    Column = breakpoint.SourceBreakpoint.Column,
+                                });
+                                goto skip;
+                            }
+
+                            RequestStopUnsafe(new StopReason_Breakpoint()
+                            {
+                                Breakpoint = breakpoint.Breakpoint,
+                            });
+
+                        skip:;
+                        }
                     }
                 }
             }

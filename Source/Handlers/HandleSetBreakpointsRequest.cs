@@ -65,7 +65,7 @@ partial class BytecodeDebugAdapter
         List<Breakpoint> result = [];
 
         List<Breakpoint> invalidBreakpoints = InvalidBreakpoints[ToUri(arguments.Source.Path)] = [];
-        List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)> validBreakpoints = Breakpoints[ToUri(arguments.Source.Path)] = [];
+        List<CompiledBreakpoint> validBreakpoints = Breakpoints[ToUri(arguments.Source.Path)] = [];
 
         foreach (SourceBreakpoint breakpoint in arguments.Breakpoints)
         {
@@ -94,7 +94,7 @@ partial class BytecodeDebugAdapter
                     InstructionReference = selectedInstructions.Instructions.Start.ToString(),
                 };
                 result.Add(r);
-                validBreakpoints.Add((r, selectedInstructions.Instructions.Start, breakpoint));
+                validBreakpoints.Add(new CompiledBreakpoint(r, selectedInstructions.Instructions.Start, breakpoint, breakpoint.Condition, breakpoint.HitCondition, breakpoint.LogMessage));
                 Log.WriteLine($"BREAKPOINT {r.Line}:{r.Column} {selectedInstructions.Instructions.Start} {r.Source.Name}");
             }
             else

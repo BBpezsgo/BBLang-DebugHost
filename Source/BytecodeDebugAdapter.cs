@@ -21,15 +21,29 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
     readonly Lock SyncLock = new();
     UniqueIds BreakpointIds;
 
-    readonly Logger Log;
+    readonly Logger _log;
+    readonly ExtLogger _extLog;
+
+    Logger Log => Protocol.IsRunning ? _extLog : _log;
 
     CompilerResult Compiled;
     BBLangGeneratorResult Generated;
     BytecodeProcessor? Processor;
 
     readonly Dictionary<Uri, List<Breakpoint>> InvalidBreakpoints = [];
-    readonly Dictionary<Uri, List<(Breakpoint Breakpoint, int Instruction, SourceBreakpoint SourceBreakpoint)>> Breakpoints = [];
+    readonly Dictionary<Uri, List<CompiledBreakpoint>> Breakpoints = [];
     readonly List<(Breakpoint Breakpoint, InstructionBreakpoint InstructionBreakpoint, int Address)> InstructionBreakpoints = [];
+
+    class CompiledBreakpoint(Breakpoint breakpoint, int instruction, SourceBreakpoint sourceBreakpoint, string condition, string hitCondition, string? logMessage)
+    {
+        public Breakpoint Breakpoint { get; } = breakpoint;
+        public int Instruction { get; } = instruction;
+        public SourceBreakpoint SourceBreakpoint { get; } = sourceBreakpoint;
+        public string Condition { get; } = condition;
+        public string HitCondition { get; } = hitCondition;
+        public string? LogMessage { get; } = logMessage;
+        public int HitCount { get; set; }
+    }
 
     readonly struct FetchedVariable
     {
@@ -92,7 +106,8 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         AllowProceedEvent = new ManualResetEvent(true);
         DidProceedEvent = new ManualResetEvent(false);
         InitializeProtocolClient(stdIn, stdOut);
-        Log = log;
+        _log = log;
+        _extLog = new ExtLogger(Protocol);
     }
 
     void ResetSession()
@@ -265,16 +280,40 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             trace = _trace;
         }
 
+        Log.Trace($"Analzing {trace.Count} stack frames ...");
+
         foreach (CallTraceItem frame in trace)
         {
-            if (frame.InstructionPointer < 0 || frame.InstructionPointer >= Processor.Code.Length) continue;
+            if (frame.InstructionPointer < 0 || frame.InstructionPointer >= Processor.Code.Length)
+            {
+                Log.Trace($"Skipping invalid stack frame {frame} (IP out of range [0..{Processor.Code.Length}])");
+                continue;
+            }
 
             FunctionInformation f = Processor.DebugInformation.GetFunctionInformation(frame.InstructionPointer);
 
             List<FetchedScope> frameScopes = [];
             ImmutableArray<ScopeInformation> _scopes = Processor.DebugInformation.GetScopes(frame.InstructionPointer);
 
-            if (frame.InstructionPointer == 0 && !f.IsValid && _scopes.IsDefaultOrEmpty) continue;
+            if (frame.InstructionPointer == 0)
+            {
+                Log.Trace($"Skipping invalid stack frame {frame} (IP is 0)");
+                continue;
+            }
+
+            if (!f.IsValid)
+            {
+                Log.Trace($"Skipping invalid stack frame {frame} (invalid function)");
+                continue;
+            }
+
+            if (_scopes.IsDefaultOrEmpty)
+            {
+                Log.Trace($"Skipping invalid stack frame {frame} (no scopes)");
+                continue;
+            }
+
+            Log.Trace($"Analyzing {_scopes.Length} scopes ...");
 
             foreach (ScopeInformation scope in _scopes)
             {
@@ -292,6 +331,11 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                         StackElementKind.Parameter => arguments,
                         _ => throw new UnreachableException(),
                     }).Add(new FetchedVariable(item));
+                }
+
+                foreach (FetchedVariable item in internals)
+                {
+                    Log.Trace($"Ignoring internal stack item {item.Value.Type} {item.Value.Identifier} ({item.Value.Size} bytes at {(item.Value.BasePointerRelative ? "BP+" : "ABS+")}{item.Value.Address})");
                 }
 
                 if (arguments.Count > 0)
