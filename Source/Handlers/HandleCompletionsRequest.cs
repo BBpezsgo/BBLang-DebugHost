@@ -144,12 +144,12 @@ partial class BytecodeDebugAdapter
                         }
                         else
                         {
-                            Log.Warn($"Missing type on {fieldExpression.Object.GetType()} {fieldExpression.Object}");
+                            Log.Warn($"Missing type on {fieldExpression.Object.GetType().Name} {fieldExpression.Object}");
                         }
                     }
                     else
                     {
-                        Log.Warn($"Field identifier {identifier.GetType().Name} {identifier} != {fieldExpression.Identifier.GetType()} {fieldExpression.Identifier}");
+                        Log.Warn($"Field identifier {identifier.GetType().Name} {identifier} != {fieldExpression.Identifier.GetType().Name} {fieldExpression.Identifier}");
                     }
                 }
             }
