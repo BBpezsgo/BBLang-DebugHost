@@ -84,7 +84,7 @@ partial class BytecodeDebugAdapter
                     && contextStatement.Count > 1
                     && contextStatement[^2] is FieldExpression fieldExpression)
                 {
-                    if (fieldExpression.Identifier == identifier)
+                    if (fieldExpression.Identifier == identifier.Identifier)
                     {
                         if (fieldExpression.Object.CompiledType is not null)
                         {

@@ -66,7 +66,7 @@ partial class BytecodeDebugAdapter
                         int offset = 0;
                         foreach (CompiledField item in v.Struct.Fields)
                         {
-                            GeneralType fieldType = GeneralType.InsertTypeParameters(item.Type, v.TypeArguments) ?? item.Type;
+                            GeneralType fieldType = GeneralType.TryInsertTypeParameters(item.Type, v.TypeArguments);
                             if (!StatementCompiler.FindSize(fieldType, out int fieldSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
                             {
                                 break;
