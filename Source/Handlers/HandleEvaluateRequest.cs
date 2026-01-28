@@ -67,7 +67,7 @@ partial class BytecodeDebugAdapter
 
             if (compiled.Statements.Length != 1)
             {
-                diagnostics.Add(Diagnostic.Error($"Expression should only have one value, {compiled.Statements.Length} passed", compiled.Statements[1]));
+                diagnostics.Add(DiagnosticAt.Error($"Expression should only have one value, {compiled.Statements.Length} passed", compiled.Statements[1]));
                 return false;
             }
 
@@ -130,7 +130,7 @@ partial class BytecodeDebugAdapter
 
             if (!state.IsDone)
             {
-                diagnostics.Add(DiagnosticWithoutContext.Error("Evaluation time out"));
+                diagnostics.Add(Diagnostic.Error("Evaluation time out"));
                 return false;
             }
 
@@ -192,7 +192,7 @@ partial class BytecodeDebugAdapter
                             result = m.Get<float>(resultAddress) != 0;
                             return true;
                         default:
-                            diagnostics.Add(Diagnostic.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
+                            diagnostics.Add(DiagnosticAt.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
                             return false;;
                     }
                 case PointerType:
@@ -202,7 +202,7 @@ partial class BytecodeDebugAdapter
                     result = m.Get<int>(resultAddress) != 0;
                     return true;
                 default:
-                    diagnostics.Add(Diagnostic.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
+                    diagnostics.Add(DiagnosticAt.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
                     return false;
             }
         }
