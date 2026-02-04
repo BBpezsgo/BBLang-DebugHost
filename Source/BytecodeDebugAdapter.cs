@@ -61,6 +61,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         Locals,
         Arguments,
         Internals,
+        Globals,
     }
 
     readonly struct FetchedScope
@@ -86,14 +87,16 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         public readonly FunctionInformation Function;
         public readonly ImmutableArray<ScopeInformation> RawScopes;
         public readonly ImmutableArray<FetchedScope> Scopes;
+        public readonly FetchedVariable? GlobalVariablesAddress;
 
-        public FetchedFrame(int id, CallTraceItem raw, FunctionInformation function, ImmutableArray<ScopeInformation> rawScopes, ImmutableArray<FetchedScope> scopes)
+        public FetchedFrame(int id, CallTraceItem raw, FunctionInformation function, ImmutableArray<ScopeInformation> rawScopes, ImmutableArray<FetchedScope> scopes, FetchedVariable? globalVariablesAddress)
         {
             Id = id;
             Raw = raw;
             Function = function;
             RawScopes = rawScopes;
             Scopes = scopes;
+            GlobalVariablesAddress = globalVariablesAddress;
         }
     }
 
@@ -271,14 +274,9 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
         if (Processor is null) return;
 
-        IReadOnlyList<CallTraceItem> trace;
-
-        {
-            List<CallTraceItem> _trace = [];
-            DebugUtils.TraceStack(Processor.Memory, Processor.Registers.BasePointer, Processor.DebugInformation.StackOffsets, _trace);
-            _trace.Insert(0, new CallTraceItem(Processor.Registers.BasePointer, Processor.Registers.CodePointer));
-            trace = _trace;
-        }
+        List<CallTraceItem> trace = [];
+        DebugUtils.TraceStack(Processor.Memory, Processor.Registers.BasePointer, Processor.DebugInformation.StackOffsets, trace);
+        trace.Insert(0, new CallTraceItem(Processor.Registers.BasePointer, Processor.Registers.CodePointer));
 
         Log.Trace($"Analzing {trace.Count} stack frames ...");
 
@@ -290,10 +288,13 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 continue;
             }
 
+            Log.Trace($"Analysing at IP {frame.InstructionPointer}");
+
             FunctionInformation f = Processor.DebugInformation.GetFunctionInformation(frame.InstructionPointer);
 
             List<FetchedScope> frameScopes = [];
             ImmutableArray<ScopeInformation> _scopes = Processor.DebugInformation.GetScopes(frame.InstructionPointer);
+            FetchedVariable? globalVariablesAddress = null;
 
             if (frame.InstructionPointer == 0)
             {
@@ -317,6 +318,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
             foreach (ScopeInformation scope in _scopes)
             {
+                List<FetchedVariable> globals = [];
                 List<FetchedVariable> locals = [];
                 List<FetchedVariable> arguments = [];
                 List<FetchedVariable> internals = [];
@@ -324,10 +326,12 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
                 foreach (StackElementInformation item in scope.Stack)
                 {
+                    Log.Trace($"{item.Type} {item.Identifier}");
                     (item.Kind switch
                     {
-                        StackElementKind.Internal => item.Identifier == "Return Value" ? returnValue : internals,
+                        StackElementKind.Internal => item.Identifier is "Return Value" or "Exit Code" ? returnValue : internals,
                         StackElementKind.Variable => locals,
+                        StackElementKind.GlobalVariable => globals,
                         StackElementKind.Parameter => arguments,
                         _ => throw new UnreachableException(),
                     }).Add(new FetchedVariable(item));
@@ -335,7 +339,12 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
                 foreach (FetchedVariable item in internals)
                 {
-                    Log.Trace($"Ignoring internal stack item {item.Value.Type} {item.Value.Identifier} ({item.Value.Size} bytes at {(item.Value.BasePointerRelative ? "BP+" : "ABS+")}{item.Value.Address})");
+                    if (item.Value.Identifier == "Absolute Global Offset")
+                    {
+                        globalVariablesAddress = item;
+                        Log.Trace($"Global variable offset captured");
+                    }
+                    //Log.Trace($"Ignoring internal stack item {item.Value.Type} {item.Value.Identifier} ({item.Value.Size} bytes at {(item.Value.BasePointerRelative ? "BP+" : "ABS+")}{item.Value.Address})");
                 }
 
                 if (arguments.Count > 0)
@@ -358,6 +367,16 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                     ));
                 }
 
+                if (globals.Count > 0)
+                {
+                    frameScopes.Add(new FetchedScope(
+                        CurrentUniqueIds.Next(),
+                        FetchedScopeKind.Globals,
+                        [.. globals],
+                        scope
+                    ));
+                }
+
                 if (returnValue.Count > 0)
                 {
                     frameScopes.Add(new FetchedScope(
@@ -374,7 +393,8 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 frame,
                 f,
                 _scopes,
-                [.. frameScopes]
+                [.. frameScopes],
+                globalVariablesAddress
             ));
         }
     }

@@ -29,7 +29,25 @@ partial class BytecodeDebugAdapter
             {
                 if (variable.Value.Kind == StackElementKind.Internal) continue;
 
-                int address = variable.Value.AbsoluteAddress(item.Raw.BasePointer, Processor.StackStart);
+                int address;
+                if (variable.Value.Kind == StackElementKind.GlobalVariable)
+                {
+                    if (item.GlobalVariablesAddress.HasValue)
+                    {
+                        int _v = item.GlobalVariablesAddress.Value.Value.AbsoluteAddress(item.Raw.BasePointer, Processor.StackStart);
+                        address = Processor.Memory.AsSpan().Get<int>(_v) + variable.Value.Address;
+                    }
+                    else
+                    {
+                        Log.Warn($"Trying to handle global variable but no offset has been captured");
+                        continue;
+                    }
+                }
+                else
+                {
+                    address = variable.Value.AbsoluteAddress(item.Raw.BasePointer, Processor.StackStart);
+                }
+
                 ExpressionVariable v = new(variable.Value.Identifier, address, variable.Value.Type);
                 variables.Add(v);
                 Log.WriteLine(v);
@@ -88,7 +106,7 @@ partial class BytecodeDebugAdapter
 
         if (Processor is null) return false;
 
-        if (!TryCompileExpression(expression, frameId, diagnostics, out var compiled))
+        if (!TryCompileExpression(expression, frameId, diagnostics, out CompilerResult compiled))
         {
             return false;
         }
@@ -148,7 +166,7 @@ partial class BytecodeDebugAdapter
     {
         result = default;
 
-        if (!TryCompileExpression(expression, frameId, diagnostics, out var compiled))
+        if (!TryCompileExpression(expression, frameId, diagnostics, out CompilerResult compiled))
         {
             return false;
         }
@@ -193,7 +211,7 @@ partial class BytecodeDebugAdapter
                             return true;
                         default:
                             diagnostics.Add(DiagnosticAt.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
-                            return false;;
+                            return false; ;
                     }
                 case PointerType:
                     result = m.Get<int>(resultAddress) != 0;
@@ -294,6 +312,7 @@ partial class BytecodeDebugAdapter
         else
         {
             StringBuilder b = new();
+            b.AppendLine("Failed to evaluate");
             diagnostics.WriteErrorsTo(b);
             Protocol.SendEvent(new OutputEvent()
             {

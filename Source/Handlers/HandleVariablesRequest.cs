@@ -1,9 +1,11 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
+using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
 namespace DebugServer;
@@ -25,7 +27,30 @@ partial class BytecodeDebugAdapter
                     List<Variable> result = [];
                     foreach (FetchedVariable variable in scope.Variables.Slice(arguments.Start, arguments.Count))
                     {
-                        Range<int> address = variable.Value.GetRange(frame.Raw.BasePointer, Processor.StackStart);
+                        Range<int> address;
+                        if (variable.Value.Kind == StackElementKind.GlobalVariable)
+                        {
+                            if (frame.GlobalVariablesAddress.HasValue)
+                            {
+                                int _v = frame.GlobalVariablesAddress.Value.Value.AbsoluteAddress(frame.Raw.BasePointer, Processor.StackStart);
+                                int o = Processor.Memory.AsSpan().Get<int>(_v);
+                                address = new Range<int>(variable.Value.Address + o, variable.Value.Address + variable.Value.Size + o);
+                            }
+                            else
+                            {
+                                Log.Warn($"Trying to handle global variable but no offset has been captured");
+                                continue;
+                            }
+                        }
+                        else if (variable.Value.Kind == StackElementKind.Internal && variable.Value.Identifier == "Exit Code")
+                        {
+                            address = new Range<int>(Processor.StackStart, Processor.StackStart + (ProcessorState.StackDirection * 4));
+                        }
+                        else
+                        {
+                            address = variable.Value.GetRange(frame.Raw.BasePointer, Processor.StackStart);
+                        }
+
                         result.Add(ToVariable(address, variable.Value.Type, Processor.Memory, variable.Value.Identifier, ref CurrentUniqueIds));
                     }
                     return new VariablesResponse(result);

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
 namespace DebugServer;
@@ -27,7 +26,8 @@ partial class BytecodeDebugAdapter
                         FetchedScopeKind.ReturnValue => ("ReturnValue", Scope.PresentationHintValue.ReturnValue),
                         FetchedScopeKind.Locals => ("Locals", Scope.PresentationHintValue.Locals),
                         FetchedScopeKind.Arguments => ("Arguments", Scope.PresentationHintValue.Arguments),
-                        FetchedScopeKind.Internals => ("Internals", default),
+                        FetchedScopeKind.Internals => ("Internals", Scope.PresentationHintValue.Unknown),
+                        FetchedScopeKind.Globals => ("Globals", Scope.PresentationHintValue.Locals),
                         _ => throw new UnreachableException(),
                     };
                     result.Add(new Scope()
