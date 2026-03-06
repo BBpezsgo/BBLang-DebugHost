@@ -1,6 +1,4 @@
-using System.Runtime.Serialization;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
-using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Serialization;
 using Newtonsoft.Json;
 
 namespace DebugServer;

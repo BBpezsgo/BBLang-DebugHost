@@ -8,6 +8,8 @@ partial class BytecodeDebugAdapter
 {
     protected override DisassembleResponse HandleDisassembleRequest(DisassembleArguments arguments)
     {
+        Log.Trace("[Handler] Disassemble");
+
         if (Processor is null
             || !int.TryParse(arguments.MemoryReference, out int address))
         {

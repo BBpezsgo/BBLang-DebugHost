@@ -7,6 +7,8 @@ partial class BytecodeDebugAdapter
 {
     protected override ReadMemoryResponse HandleReadMemoryRequest(ReadMemoryArguments arguments)
     {
+        Log.Trace($"[Handler] ReadMemory");
+
         if (Processor is null
             || !int.TryParse(arguments.MemoryReference, out int address))
         {

@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Collections.Immutable;
 using System.Linq;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
@@ -16,28 +16,13 @@ partial class BytecodeDebugAdapter
     protected override CompletionsResponse HandleCompletionsRequest(CompletionsArguments arguments)
     {
         SinglePosition p = new(LineFromClient(arguments.Line ?? clientsFirstLine), ColumnFromClient(arguments.Column));
-        Log.WriteLine($"HandleCompletionsRequest({p}, `{arguments.Text}`)");
+        Log.Trace($"[Handler] Completions ({p}, \"{arguments.Text}\")");
 
         List<CompletionItem> result = [];
 
         if (Processor is null) return new CompletionsResponse(result);
 
         List<ExpressionVariable> variables = arguments.FrameId.HasValue ? GetExpressionVariables(arguments.FrameId.Value) : [];
-
-        if (string.IsNullOrWhiteSpace(arguments.Text))
-        {
-            foreach (ExpressionVariable item in variables)
-            {
-                result.Add(new CompletionItem()
-                {
-                    Type = CompletionItemType.Variable,
-                    Label = item.Name,
-                    Detail = item.Type.ToString(),
-                });
-            }
-
-            return new CompletionsResponse(result);
-        }
 
         try
         {
@@ -57,6 +42,29 @@ partial class BytecodeDebugAdapter
             if (!ast.IsNotEmpty) return new CompletionsResponse();
 
             List<Statement> contextStatement = [];
+            Dictionary<string, int> functionOverloads = [];
+
+            void AddExpressionItems()
+            {
+                foreach (CompiledFunctionDefinition function in compiled.FunctionDefinitions)
+                {
+                    if (!function.CanUse(compiled.File)) continue;
+
+                    if (!functionOverloads.TryGetValue(function.Identifier.Content, out int value)) value = 0;
+                    functionOverloads[function.Identifier.Content] = value + 1;
+                }
+
+                foreach (VariableDefinition variable in ast.TopLevelStatements.OfType<VariableDefinition>())
+                {
+                    if (!variable.CanUse(compiled.File)) continue;
+
+                    result.Add(new CompletionItem()
+                    {
+                        Type = CompletionItemType.Variable,
+                        Label = variable.Identifier.Content,
+                    });
+                }
+            }
 
             foreach (Statement _statement in ast.EnumerateStatements())
             {
@@ -66,16 +74,16 @@ partial class BytecodeDebugAdapter
                     for (int i = 0; i < contextStatement.Count; i++)
                     {
                         if (StatementWalker.Visit(contextStatement[i]).Contains(_statement)) continue;
-                        Log.Debug($"{contextStatement[i].GetType().Name} {contextStatement[i]}");
+                        Log.Trace($"{contextStatement[i].GetType().Name} {contextStatement[i]}");
                         contextStatement.RemoveAt(i--);
                     }
                     contextStatement.Add(_statement);
                 }
             }
 
-            foreach (var item in contextStatement)
+            foreach (Statement item in contextStatement)
             {
-                Log.Debug($"{item.GetType().Name} {item}");
+                Log.Trace($"{item.GetType().Name} {item}");
             }
 
             if (contextStatement.Count > 0)
@@ -84,7 +92,7 @@ partial class BytecodeDebugAdapter
                     && contextStatement.Count > 1
                     && contextStatement[^2] is FieldExpression fieldExpression)
                 {
-                    if (fieldExpression.Identifier == identifier.Identifier)
+                    if (fieldExpression.Object == identifier)
                     {
                         if (fieldExpression.Object.CompiledType is not null)
                         {
@@ -93,6 +101,8 @@ partial class BytecodeDebugAdapter
                             {
                                 GeneralType prevType = fieldExpression.Object.CompiledType;
                                 checkTypes.Add(prevType);
+                                checkTypes.Add(new ReferenceType(prevType));
+                                checkTypes.Add(new PointerType(prevType));
                                 while (true)
                                 {
                                     if (prevType.Is(out PointerType? pointerType2))
@@ -112,11 +122,9 @@ partial class BytecodeDebugAdapter
                                 }
                             }
 
-                            Dictionary<string, int> functionOverloads = [];
-
                             foreach (GeneralType prevType in checkTypes)
                             {
-                                Log.Debug($"{prevType}");
+                                Log.Trace($"{prevType}");
                                 if (prevType is StructType structType)
                                 {
                                     foreach (CompiledField item in structType.Struct.Fields)
@@ -141,18 +149,6 @@ partial class BytecodeDebugAdapter
                                     functionOverloads[function.Identifier.Content] = value + 1;
                                 }
                             }
-
-                            foreach ((string function, int overloads) in functionOverloads)
-                            {
-                                result.Add(new CompletionItem()
-                                {
-                                    Type = CompletionItemType.Function,
-                                    Label = function,
-                                    Detail = overloads <= 1 ? null : $"{overloads} overloads",
-                                });
-                            }
-
-                            return new CompletionsResponse(result);
                         }
                         else
                         {
@@ -161,15 +157,32 @@ partial class BytecodeDebugAdapter
                     }
                     else
                     {
-                        Log.Warn($"Field identifier {identifier.GetType().Name} {identifier} != {fieldExpression.Identifier.GetType().Name} {fieldExpression.Identifier}");
+                        Log.Warn($"Field identifier mismatch: {fieldExpression.Object.GetType().Name} {fieldExpression.Object} != {identifier.GetType().Name} {identifier}");
                     }
                 }
+                else if (contextStatement[^1] is MissingExpression)
+                {
+                    AddExpressionItems();
+                }
+            }
+            else
+            {
+                AddExpressionItems();
+            }
+
+            foreach ((string function, int overloads) in functionOverloads)
+            {
+                result.Add(new CompletionItem()
+                {
+                    Type = CompletionItemType.Function,
+                    Label = function,
+                    Detail = overloads <= 1 ? null : $"{overloads} overloads",
+                });
             }
         }
         catch (Exception ex)
         {
             Log.Error(ex);
-            return new CompletionsResponse(result);
         }
 
         return new CompletionsResponse(result);

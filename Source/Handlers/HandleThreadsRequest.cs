@@ -6,7 +6,15 @@ partial class BytecodeDebugAdapter
 {
     protected override ThreadsResponse HandleThreadsRequest(ThreadsArguments arguments)
     {
-        Log.WriteLine("HandleThreadsRequest");
+        Log.Trace($"[Handler] Threads");
+
+        if (Processor is null)
+        {
+            return new ThreadsResponse()
+            {
+                Threads = [],
+            };
+        }
 
         return new ThreadsResponse()
         {

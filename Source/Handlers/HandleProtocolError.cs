@@ -6,6 +6,6 @@ partial class BytecodeDebugAdapter
 {
     protected override void HandleProtocolError(Exception ex)
     {
-        Log.WriteLine(ex);
+        Log.Error(ex);
     }
 }

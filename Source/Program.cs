@@ -23,24 +23,24 @@ static class Program
 
         try
         {
-            log.WriteLine("Started");
+            log.Info("Started");
 
             BytecodeDebugAdapter adapter = new(Console.OpenStandardInput(), Console.OpenStandardOutput(), log);
             adapter.Protocol.LogMessage += (sender, e) => log.WriteLine(e.Message);
-            adapter.Protocol.DispatcherError += (sender, e) => log.WriteLine(e.Exception.Message);
+            adapter.Protocol.DispatcherError += (sender, e) => log.Error(e.Exception.Message);
 
             adapter.Run();
 
-            log.WriteLine("Waiting for reader");
+            log.Debug("Waiting for reader");
 
             adapter.Protocol.WaitForReader();
 
-            log.WriteLine("Exited");
+            log.Info("Exited");
             return 0;
         }
         catch (Exception ex)
         {
-            log.WriteLine(ex);
+            log.Error(ex);
             return 1;
         }
         finally

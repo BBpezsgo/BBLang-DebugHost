@@ -9,7 +9,7 @@ partial class BytecodeDebugAdapter
 {
     protected override ScopesResponse HandleScopesRequest(ScopesArguments arguments)
     {
-        Log.WriteLine("HandleScopesRequest");
+        Log.Trace($"[Handler] Scopes");
 
         if (Processor is null) return new ScopesResponse();
 

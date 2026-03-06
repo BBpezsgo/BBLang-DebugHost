@@ -17,7 +17,7 @@ partial class BytecodeDebugAdapter
 {
     protected override LaunchResponse HandleLaunchRequest(LaunchArguments arguments)
     {
-        Log.WriteLine("HandleLaunchRequest");
+        Log.Trace($"[Handler] Launch");
 
         string fileName = arguments.ConfigurationProperties.GetValueAsString("program");
         if (string.IsNullOrEmpty(fileName))

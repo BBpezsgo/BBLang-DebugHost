@@ -58,7 +58,7 @@ partial class BytecodeDebugAdapter
 
     protected override SetBreakpointsResponse HandleSetBreakpointsRequest(SetBreakpointsArguments arguments)
     {
-        Log.WriteLine("HandleSetBreakpointsRequest");
+        Log.Trace($"[Handler] SetBreakpoints");
 
         if (Processor is null || NoDebug) return new SetBreakpointsResponse([]);
 

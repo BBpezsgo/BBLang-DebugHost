@@ -6,7 +6,7 @@ partial class BytecodeDebugAdapter
 {
     protected override ContinueResponse HandleContinueRequest(ContinueArguments arguments)
     {
-        Log.WriteLine("HandleContinueRequest");
+        Log.Trace("[Handler] Continue");
 
         Continue(null);
         return new ContinueResponse();

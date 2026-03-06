@@ -6,7 +6,7 @@ partial class BytecodeDebugAdapter
 {
     protected override DisconnectResponse HandleDisconnectRequest(DisconnectArguments arguments)
     {
-        Log.WriteLine("HandleDisconnectRequest");
+        Log.Trace("[Handler] Disconnect");
 
         IsDisconnected = true;
 

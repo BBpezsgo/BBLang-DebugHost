@@ -16,17 +16,17 @@ partial class BytecodeDebugAdapter
             {
                 StopReason = null;
                 ShouldStop = false;
-                //Log.WriteLine($"STOP REASON NULL");
+                //Log.Trace($"STOP REASON NULL");
             }
         }
 
         if (AllowProceedEvent.Set())
         {
-            //Log.WriteLine($"CONTINUE PROCEED");
+            //Log.Trace($"CONTINUE PROCEED");
         }
         else
         {
-            Log.WriteLine($"CONTINUE PROCEED failed");
+            Log.Trace($"CONTINUE PROCEED failed");
         }
     }
 
@@ -59,15 +59,15 @@ partial class BytecodeDebugAdapter
 
         StopReason = reason;
         ShouldStop = true;
-        //Log.WriteLine($"STOP REASON {reason}");
+        //Log.Trace($"STOP REASON {reason}");
 
         if (AllowProceedEvent.Reset())
         {
-            //Log.WriteLine($"CONTINUE BLOCK");
+            //Log.Trace($"CONTINUE BLOCK");
         }
         else
         {
-            Log.WriteLine($"CONTINUE BLOCK failed");
+            Log.Trace($"CONTINUE BLOCK failed");
         }
     }
 }

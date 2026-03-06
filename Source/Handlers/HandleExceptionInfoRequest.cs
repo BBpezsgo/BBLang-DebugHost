@@ -6,6 +6,8 @@ partial class BytecodeDebugAdapter
 {
     protected override ExceptionInfoResponse HandleExceptionInfoRequest(ExceptionInfoArguments arguments)
     {
+        Log.Trace($"[Handler] ExceptionInfo");
+
         if (arguments.ThreadId != 1 || Processor is null || CrashReason is null) return new ExceptionInfoResponse();
 
         return new ExceptionInfoResponse()

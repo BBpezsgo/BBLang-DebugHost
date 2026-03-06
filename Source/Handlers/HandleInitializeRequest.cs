@@ -6,7 +6,7 @@ partial class BytecodeDebugAdapter
 {
     protected override InitializeResponse HandleInitializeRequest(InitializeArguments arguments)
     {
-        Log.WriteLine("HandleInitializeRequest");
+        Log.Trace($"[Handler] Initialize");
 
         if (arguments.LinesStartAt1 == true) clientsFirstLine = 1;
         if (arguments.ColumnsStartAt1 == true) clientsFirstColumn = 1;

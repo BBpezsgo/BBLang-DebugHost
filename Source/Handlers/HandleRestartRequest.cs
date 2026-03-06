@@ -7,21 +7,21 @@ partial class BytecodeDebugAdapter
 {
     protected override RestartResponse HandleRestartRequest(RestartArguments arguments)
     {
-        Log.WriteLine($"HandleRestartRequest");
+        Log.Trace($"[Handler] Restart");
 
         IsRestarting = true;
 
-        Log.WriteLine($"restarting ...");
+        Log.Trace($"restarting ...");
 
-        Log.WriteLine($" allow runtime to proceed");
+        Log.Trace($" allow runtime to proceed");
         AllowProceedEvent.Set();
-        Log.WriteLine($" waiting for proceeding");
+        Log.Trace($" waiting for proceeding");
         DidProceedEvent.WaitOne();
 
-        Log.WriteLine($" reset session");
+        Log.Trace($" reset session");
         ResetSession();
 
-        Log.WriteLine($" creating new processor");
+        Log.Trace($" creating new processor");
         Processor = new BytecodeProcessor(
             BytecodeInterpreterSettings.Default,
             Generated.Code,
@@ -40,12 +40,12 @@ partial class BytecodeDebugAdapter
             StopReason = null;
         }
 
-        Log.WriteLine($" creating runtime thread");
+        Log.Trace($" creating runtime thread");
         RuntimeThread = new(RuntimeImpl)
         {
             Name = "Runtime Thread"
         };
-        Log.WriteLine($" starting runtime thread");
+        Log.Trace($" starting runtime thread");
         RuntimeThread.Start();
 
         return new RestartResponse();

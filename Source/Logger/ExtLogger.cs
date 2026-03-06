@@ -10,7 +10,7 @@ class ExtLogger(DebugProtocolClient protocol) : Logger
         protocol.SendEvent(new DebugLogEvent()
         {
             Message = message ?? string.Empty,
-            Level = null,
+            Level = level,
         });
     }
 

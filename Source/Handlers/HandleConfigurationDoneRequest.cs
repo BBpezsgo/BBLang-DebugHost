@@ -7,7 +7,7 @@ partial class BytecodeDebugAdapter
 {
     protected override ConfigurationDoneResponse HandleConfigurationDoneRequest(ConfigurationDoneArguments arguments)
     {
-        Log.WriteLine("HandleConfigurationDoneRequest");
+        Log.Trace("[Handler] ConfigurationDone");
     
         if (RuntimeThread is null) throw new InvalidOperationException($"{nameof(RuntimeThread)} is null");
         RuntimeThread.Start();

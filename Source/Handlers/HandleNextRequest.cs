@@ -7,7 +7,7 @@ partial class BytecodeDebugAdapter
 {
     protected override NextResponse HandleNextRequest(NextArguments arguments)
     {
-        Log.WriteLine("HandleNextRequest");
+        Log.Trace($"[Handler] Next");
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request Next in no-debug mode");
 

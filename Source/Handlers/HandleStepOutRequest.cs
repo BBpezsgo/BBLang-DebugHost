@@ -7,7 +7,7 @@ partial class BytecodeDebugAdapter
 {
     protected override StepOutResponse HandleStepOutRequest(StepOutArguments arguments)
     {
-        Log.WriteLine("HandleStepOutRequest");
+        Log.Trace($"[Handler] StepOut");
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request StepOut in no-debug mode");
 

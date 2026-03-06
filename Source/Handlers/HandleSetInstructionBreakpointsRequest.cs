@@ -7,6 +7,8 @@ partial class BytecodeDebugAdapter
 {
     protected override SetInstructionBreakpointsResponse HandleSetInstructionBreakpointsRequest(SetInstructionBreakpointsArguments arguments)
     {
+        Log.Trace($"[Handler] SetInstructionBreakpoints");
+
         if (Processor is null) return new SetInstructionBreakpointsResponse();
 
         InstructionBreakpoints.Clear();

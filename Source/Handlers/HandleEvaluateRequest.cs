@@ -235,6 +235,8 @@ partial class BytecodeDebugAdapter
 
     protected override EvaluateResponse HandleEvaluateRequest(EvaluateArguments arguments)
     {
+        Log.Trace("[Handler] Evaluate");
+
         if (Processor is null) return new EvaluateResponse();
 
         DiagnosticsCollection diagnostics = new();

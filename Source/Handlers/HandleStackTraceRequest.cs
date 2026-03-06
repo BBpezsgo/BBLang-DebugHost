@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
@@ -10,7 +9,7 @@ partial class BytecodeDebugAdapter
 {
     protected override StackTraceResponse HandleStackTraceRequest(StackTraceArguments arguments)
     {
-        Log.WriteLine("HandleStackTraceRequest");
+        Log.Trace($"[Handler] StackTrace");
 
         if (Processor is null) return new StackTraceResponse();
 

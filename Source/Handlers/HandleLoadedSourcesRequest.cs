@@ -9,7 +9,7 @@ partial class BytecodeDebugAdapter
 {
     protected override LoadedSourcesResponse HandleLoadedSourcesRequest(LoadedSourcesArguments arguments)
     {
-        Log.WriteLine("HandleLoadedSourcesRequest");
+        Log.Trace($"[Handler] LoadedSources");
 
         List<Source> result = [];
 

@@ -39,7 +39,7 @@ partial class BytecodeDebugAdapter
     {
         using (SyncLock.EnterScope())
         {
-            Log.WriteLine("[#] Started");
+            Log.Trace("[#] Started");
             Protocol.SendEvent(new ContinuedEvent()
             {
                 ThreadId = 1,
@@ -84,7 +84,7 @@ partial class BytecodeDebugAdapter
                         }
                     }
 
-                    Log.WriteLine("[#] Stopped");
+                    Log.Trace("[#] Stopped");
                     GatherInformation();
                     IsStopped = true;
                     LastStopContext = new StopContext()
@@ -98,7 +98,7 @@ partial class BytecodeDebugAdapter
                     switch (StopReason)
                     {
                         case null:
-                            Log.WriteLine("[#] Stopped for no reason");
+                            Log.Trace("[#] Stopped for no reason");
                             throw new InvalidOperationException("Stopped for no reason");
                         case StopReason_StepForward:
                         case StopReason_StepIn:
@@ -141,14 +141,14 @@ partial class BytecodeDebugAdapter
                     }
                 }
 
-                Log.WriteLine("[#] Waiting to continue ...");
+                Log.Trace("[#] Waiting to continue ...");
                 AllowProceedEvent.WaitOne();
-                Log.WriteLine("[#] Continued");
+                Log.Trace("[#] Continued");
                 DidProceedEvent.Set();
 
                 if (IsRestarting)
                 {
-                    Log.WriteLine("[#] Breaking runtime thread (restarting)");
+                    Log.Trace("[#] Breaking runtime thread (restarting)");
                     break;
                 }
 
@@ -200,7 +200,7 @@ partial class BytecodeDebugAdapter
                 {
                     if (item.Address != Processor.Registers.CodePointer) continue;
 
-                    Log.WriteLine($"BREAKPOINT HIT at {item.Address}");
+                    Log.Trace($"BREAKPOINT HIT at {item.Address}");
 
                     RequestStopUnsafe(new StopReason_Breakpoint()
                     {
@@ -214,7 +214,7 @@ partial class BytecodeDebugAdapter
                     {
                         if (breakpoint.Instruction != Processor.Registers.CodePointer) continue;
 
-                        Log.WriteLine($"BREAKPOINT HIT {breakpoint.SourceBreakpoint.Line}:{breakpoint.SourceBreakpoint.Column} at {breakpoint.Instruction} in {breakpoint.Breakpoint.Source.Name}");
+                        Log.Trace($"BREAKPOINT HIT {breakpoint.SourceBreakpoint.Line}:{breakpoint.SourceBreakpoint.Column} at {breakpoint.Instruction} in {breakpoint.Breakpoint.Source.Name}");
 
                         using (SyncLock.EnterScope())
                         {
@@ -339,6 +339,6 @@ partial class BytecodeDebugAdapter
 
         Processor = null;
 
-        Log.WriteLine("[#] Exited");
+        Log.Trace("[#] Exited");
     }
 }

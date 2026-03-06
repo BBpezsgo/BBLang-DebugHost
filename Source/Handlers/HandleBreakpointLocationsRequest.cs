@@ -9,7 +9,7 @@ partial class BytecodeDebugAdapter
 {
     protected override BreakpointLocationsResponse HandleBreakpointLocationsRequest(BreakpointLocationsArguments arguments)
     {
-        Log.WriteLine("HandleBreakpointLocationsRequest");
+        Log.Trace($"[Handler] BreakpointLocations");
 
         if (Processor is null || NoDebug) return new BreakpointLocationsResponse();
 

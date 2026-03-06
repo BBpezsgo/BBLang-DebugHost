@@ -7,7 +7,7 @@ partial class BytecodeDebugAdapter
 {
     protected override StepInResponse HandleStepInRequest(StepInArguments arguments)
     {
-        Log.WriteLine("HandleStepInRequest");
+        Log.Trace($"[Handler] StepIn");
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request StepIn in no-debug mode");
 

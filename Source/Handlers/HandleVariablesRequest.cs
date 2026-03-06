@@ -14,6 +14,8 @@ partial class BytecodeDebugAdapter
 {
     protected override VariablesResponse HandleVariablesRequest(VariablesArguments arguments)
     {
+        Log.Trace($"[Handler] Variables");
+
         if (Processor is null) return new VariablesResponse();
 
         using (SyncLock.EnterScope())

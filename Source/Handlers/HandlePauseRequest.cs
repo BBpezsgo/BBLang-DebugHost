@@ -7,7 +7,7 @@ partial class BytecodeDebugAdapter
 {
     protected override PauseResponse HandlePauseRequest(PauseArguments arguments)
     {
-        Log.WriteLine("HandlePauseRequest");
+        Log.Trace($"[Handler] Pause");
 
         if (NoDebug) throw new InvalidOperationException($"Cannot handle request Pause in no-debug mode");
 

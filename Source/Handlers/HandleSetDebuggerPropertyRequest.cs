@@ -6,7 +6,7 @@ partial class BytecodeDebugAdapter
 {
     protected override SetDebuggerPropertyResponse HandleSetDebuggerPropertyRequest(SetDebuggerPropertyArguments arguments)
     {
-        Log.WriteLine("HandleSetDebuggerPropertyRequest");
+        Log.Trace($"[Handler] SetDebuggerProperty");
 
         return new SetDebuggerPropertyResponse();
     }

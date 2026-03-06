@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Threading;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
@@ -11,7 +10,6 @@ using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
-using StackFrame = Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.StackFrame;
 using SysThread = System.Threading.Thread;
 
 namespace DebugServer;
@@ -430,7 +428,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         {
             SysThread.Sleep(50);
         }
-        Log.WriteLine("Stopping protocol");
+        Log.Info("Stopping protocol");
         Protocol.Stop();
     }
 }
