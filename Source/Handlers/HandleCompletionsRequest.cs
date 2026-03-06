@@ -93,10 +93,22 @@ partial class BytecodeDebugAdapter
                             {
                                 GeneralType prevType = fieldExpression.Object.CompiledType;
                                 checkTypes.Add(prevType);
-                                while (prevType.Is(out PointerType? pointerType2))
+                                while (true)
                                 {
-                                    prevType = pointerType2.To;
-                                    checkTypes.Add(prevType);
+                                    if (prevType.Is(out PointerType? pointerType2))
+                                    {
+                                        prevType = pointerType2.To;
+                                        checkTypes.Add(prevType);
+                                    }
+                                    else if (prevType.Is(out ReferenceType? referenceType2))
+                                    {
+                                        prevType = referenceType2.To;
+                                        checkTypes.Add(prevType);
+                                    }
+                                    else
+                                    {
+                                        break;
+                                    }
                                 }
                             }
 

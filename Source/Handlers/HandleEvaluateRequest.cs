@@ -216,6 +216,9 @@ partial class BytecodeDebugAdapter
                 case PointerType:
                     result = m.Get<int>(resultAddress) != 0;
                     return true;
+                case ReferenceType:
+                    result = m.Get<int>(resultAddress) != 0;
+                    return true;
                 case FunctionType:
                     result = m.Get<int>(resultAddress) != 0;
                     return true;

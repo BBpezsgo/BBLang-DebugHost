@@ -12,7 +12,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="../Core/Source/Core.csproj" />
+    <ProjectReference Include="../Core/Source/Core.csproj">
+        <SetConfiguration>ForDebugHost=true</SetConfiguration>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>

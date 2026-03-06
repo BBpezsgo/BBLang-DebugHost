@@ -65,6 +65,7 @@ partial class BytecodeDebugAdapter
                 {
                     case BuiltinType:
                     case PointerType:
+                    case ReferenceType:
                     {
                         result.Add(ToVariable(indirectVariable.Address, indirectVariable.Type, Processor.Memory, $"*{indirectVariable.ParentName}", ref CurrentUniqueIds));
                         break;

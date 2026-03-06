@@ -1,0 +1,15 @@
+#!/bin/sh
+
+rm -rf ./out
+
+dotnet publish --configuration Release --output ./out/linux-x64 -r linux-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+cd ./out/linux-x64
+zip ../debugserver-linux-x64.zip DebugServer
+cd ../..
+rm -rf ./out/linux-x64
+
+dotnet publish --configuration Release --output ./out/win-x64 -r win-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+cd ./out/win-x64
+zip ../debugserver-win-x64.zip DebugServer.exe
+cd ../..
+rm -rf ./out/win-x64
