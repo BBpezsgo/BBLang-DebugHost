@@ -6,7 +6,6 @@ using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
 using LanguageCore.Runtime;
 using LanguageCore.Workspaces;
-using LanguageServer;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Utilities;
