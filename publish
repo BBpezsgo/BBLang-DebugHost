@@ -1,15 +1,17 @@
 #!/bin/sh
 
+set -e
+
 rm -rf ./out
 
-dotnet publish --configuration Release --output ./out/linux-x64 -r linux-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+dotnet publish --configuration Release --output ./out/linux-x64 -r linux-x64 -p:DebugType=None
 cd ./out/linux-x64
-zip ../debugserver-linux-x64.zip DebugServer
+zip ../linux-x64.zip bblang_debughost
 cd ../..
 rm -rf ./out/linux-x64
 
-dotnet publish --configuration Release --output ./out/win-x64 -r win-x64 -p:PublishSingleFile=true -p:DebugType=None --self-contained true
+dotnet publish --configuration Release --output ./out/win-x64 -r win-x64 -p:DebugType=None
 cd ./out/win-x64
-zip ../debugserver-win-x64.zip DebugServer.exe
+zip ../win-x64.zip bblang_debughost.exe
 cd ../..
 rm -rf ./out/win-x64
