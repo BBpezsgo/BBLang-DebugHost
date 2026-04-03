@@ -15,10 +15,20 @@ partial class BytecodeDebugAdapter
 
         using (SyncLock.EnterScope())
         {
-            foreach (FetchedFrame item in StackFrames)
+            for (int i = 0; i < StackFrames.Count; i++)
             {
+                FetchedFrame item = StackFrames[i];
                 if (item.Id != arguments.FrameId) continue;
                 List<Scope> result = [];
+                if (i == 0)
+                {
+                    result.Add(new Scope()
+                    {
+                        Name = "Registers",
+                        PresentationHint = Scope.PresentationHintValue.Registers,
+                        VariablesReference = int.MaxValue,
+                    });
+                }
                 foreach (FetchedScope scope in item.Scopes)
                 {
                     (string name, Scope.PresentationHintValue presentationHint) = scope.Kind switch

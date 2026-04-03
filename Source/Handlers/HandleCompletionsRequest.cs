@@ -21,6 +21,7 @@ partial class BytecodeDebugAdapter
         List<CompletionItem> result = [];
 
         if (Processor is null) return new CompletionsResponse(result);
+        if (!IsStopped) return new CompletionsResponse(result);
 
         List<ExpressionVariable> variables = arguments.FrameId.HasValue ? GetExpressionVariables(arguments.FrameId.Value) : [];
 

@@ -36,6 +36,7 @@ partial class BytecodeDebugAdapter
                             Path = location.Location.File.ToString(),
                         },
                         InstructionPointerReference = location.Instructions.Start.ToString(),
+                        PresentationHint = StackFrame.PresentationHintValue.Normal,
                     });
                 }
                 else if (frame.Function.IsValid && frame.Function.File is not null)
@@ -54,6 +55,17 @@ partial class BytecodeDebugAdapter
                             Path = frame.Function.File.ToString(),
                         },
                         InstructionPointerReference = location.Instructions.Start.ToString(),
+                        PresentationHint = StackFrame.PresentationHintValue.Normal,
+                    });
+                }
+                else if (frame.Function.IsValid)
+                {
+                    result.Add(new StackFrame()
+                    {
+                        Id = frame.Id,
+                        Name = functionName,
+                        InstructionPointerReference = frame.Raw.InstructionPointer.ToString(),
+                        PresentationHint = StackFrame.PresentationHintValue.Normal,
                     });
                 }
                 else
@@ -63,6 +75,7 @@ partial class BytecodeDebugAdapter
                         Id = frame.Id,
                         Name = functionName,
                         InstructionPointerReference = frame.Raw.InstructionPointer.ToString(),
+                        PresentationHint = StackFrame.PresentationHintValue.Subtle,
                     });
                 }
             }

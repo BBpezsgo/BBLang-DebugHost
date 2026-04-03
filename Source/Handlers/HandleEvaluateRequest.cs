@@ -16,6 +16,7 @@ partial class BytecodeDebugAdapter
     List<ExpressionVariable> GetExpressionVariables(int frameId)
     {
         if (Processor is null) return [];
+
         if (StackFrames.Count <= 0) return [];
 
         FetchedFrame item = StackFrames[0];
@@ -238,6 +239,15 @@ partial class BytecodeDebugAdapter
         Log.Trace("[Handler] Evaluate");
 
         if (Processor is null) return new EvaluateResponse();
+
+        if (!IsStopped)
+        {
+            foreach (char c in arguments.Expression)
+            {
+                IO?.SendKey(c);
+            }
+            return new EvaluateResponse();
+        }
 
         DiagnosticsCollection diagnostics = new();
         if (TryEvaluate(arguments.Expression, arguments.FrameId, diagnostics, out byte[]? memory, out int resultAddress, out var resultType))

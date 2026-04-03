@@ -113,6 +113,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
 
     void ResetSession()
     {
+        IO = null;
         StackFrames.Clear();
         IndirectVariables.Clear();
         IsStopped = false;
@@ -313,12 +314,28 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
             if (!f.IsValid)
             {
                 Log.Trace($"Skipping invalid stack frame {frame} (invalid function)");
+                StackFrames.Add(new FetchedFrame(
+                    CurrentUniqueIds.Next(),
+                    frame,
+                    f,
+                    [],
+                    [],
+                    null
+                ));
                 continue;
             }
 
             if (_scopes.IsDefaultOrEmpty)
             {
                 Log.Trace($"Skipping invalid stack frame {frame} (no scopes)");
+                StackFrames.Add(new FetchedFrame(
+                    CurrentUniqueIds.Next(),
+                    frame,
+                    f,
+                    [],
+                    [],
+                    null
+                ));
                 continue;
             }
 

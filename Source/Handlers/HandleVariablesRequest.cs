@@ -18,15 +18,28 @@ partial class BytecodeDebugAdapter
 
         if (Processor is null) return new VariablesResponse();
 
+        List<Variable> result = [];
+
         using (SyncLock.EnterScope())
         {
+            if (arguments.VariablesReference == int.MaxValue)
+            {
+                result.Add(new Variable("EBP", Processor.Registers.BasePointer.ToString(), 0));
+                result.Add(new Variable("ESP", Processor.Registers.StackPointer.ToString(), 0));
+                result.Add(new Variable("ECP", Processor.Registers.CodePointer.ToString(), 0));
+                result.Add(new Variable("FLAGS", Processor.Registers.Flags.ToString(), 0));
+                result.Add(new Variable("EAX", Processor.Registers.EAX.ToString(), 0));
+                result.Add(new Variable("EBX", Processor.Registers.EBX.ToString(), 0));
+                result.Add(new Variable("ECX", Processor.Registers.ECX.ToString(), 0));
+                result.Add(new Variable("EDX", Processor.Registers.EDX.ToString(), 0));
+            }
+
             foreach (FetchedFrame frame in StackFrames)
             {
                 foreach (FetchedScope scope in frame.Scopes)
                 {
                     if (scope.Id != arguments.VariablesReference) continue;
 
-                    List<Variable> result = [];
                     foreach (FetchedVariable variable in scope.Variables.Slice(arguments.Start, arguments.Count))
                     {
                         Range<int> address;
@@ -55,14 +68,13 @@ partial class BytecodeDebugAdapter
 
                         result.Add(ToVariable(address, variable.Value.Type, Processor.Memory, variable.Value.Identifier, ref CurrentUniqueIds));
                     }
-                    return new VariablesResponse(result);
+                    goto end;
                 }
             }
 
             foreach (var indirectVariable in IndirectVariables)
             {
                 if (indirectVariable.Id != arguments.VariablesReference) continue;
-                List<Variable> result = [];
                 switch (indirectVariable.Type.FinalValue)
                 {
                     case BuiltinType:
@@ -109,10 +121,11 @@ partial class BytecodeDebugAdapter
                     default:
                         throw new UnreachableException();
                 }
-                return new VariablesResponse(result);
+                goto end;
             }
         }
 
-        return new VariablesResponse();
+    end:
+        return new VariablesResponse(result);
     }
 }

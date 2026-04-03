@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.IO;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
@@ -10,8 +11,7 @@ partial class BytecodeDebugAdapter
     {
         Log.Trace("[Handler] Disassemble");
 
-        if (Processor is null
-            || !int.TryParse(arguments.MemoryReference, out int address))
+        if (Processor is null || !int.TryParse(arguments.MemoryReference, out int address))
         {
             return new DisassembleResponse();
         }
@@ -29,11 +29,31 @@ partial class BytecodeDebugAdapter
                 if (j >= Processor.Code.Length) break;
                 Instruction c = Processor.Code[j];
 
-                result.Add(new DisassembledInstruction()
+                if (Processor.DebugInformation.TryGetSourceLocation(j, out SourceCodeLocation sourceLocation))
                 {
-                    Address = j.ToString(),
-                    Instruction = c.ToString(),
-                });
+                    result.Add(new DisassembledInstruction()
+                    {
+                        Address = j.ToString(),
+                        Instruction = c.ToString(),
+                        Line = LineToClient(sourceLocation.Location.Position.Range.Start.Line),
+                        EndLine = LineToClient(sourceLocation.Location.Position.Range.End.Line),
+                        Column = LineToClient(sourceLocation.Location.Position.Range.Start.Character),
+                        EndColumn = LineToClient(sourceLocation.Location.Position.Range.End.Character),
+                        Location = new Source()
+                        {
+                            Name = Path.GetFileName(sourceLocation.Location.File.ToString()),
+                            Path = sourceLocation.Location.File.ToString(),
+                        },
+                    });
+                }
+                else
+                {
+                    result.Add(new DisassembledInstruction()
+                    {
+                        Address = j.ToString(),
+                        Instruction = c.ToString(),
+                    });
+                }
             }
 
             return new DisassembleResponse(result);

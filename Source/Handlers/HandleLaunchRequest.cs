@@ -14,6 +14,8 @@ namespace DebugServer;
 
 partial class BytecodeDebugAdapter
 {
+    VirtualIO? IO;
+
     protected override LaunchResponse HandleLaunchRequest(LaunchArguments arguments)
     {
         Log.Trace($"[Handler] Launch");
@@ -39,9 +41,9 @@ partial class BytecodeDebugAdapter
         StopOnEntry = arguments.ConfigurationProperties.GetValueAsBool("stopOnEntry") ?? false;
 
         Log.Trace($"Preparing");
-        VirtualIO io = new();
-        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(io);
-        io.OnStdOut += WriteStdout;
+        IO = new();
+        List<IExternalFunction> externalFunctions = BytecodeProcessor.GetExternalFunctions(IO);
+        IO.OnData += WriteStdout;
 
         DiagnosticsCollection diagnostics = new();
 
