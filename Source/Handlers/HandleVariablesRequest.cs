@@ -111,7 +111,7 @@ partial class BytecodeDebugAdapter
                             {
                                 break;
                             }
-                            result.Add(ToVariable(indirectVariable.Address + offset, fieldType, Processor.Memory, $"{indirectVariable.ParentName}.{item.Identifier.Content}", ref CurrentUniqueIds));
+                            result.Add(ToVariable(indirectVariable.Address + offset, fieldType, Processor.Memory, $"{indirectVariable.ParentName}.{item.Identifier}", ref CurrentUniqueIds));
                             offset += fieldSize;
                         }
                         break;

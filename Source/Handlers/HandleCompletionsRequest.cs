@@ -49,10 +49,10 @@ partial class BytecodeDebugAdapter
             {
                 foreach (CompiledFunctionDefinition function in compiled.FunctionDefinitions)
                 {
-                    if (!function.CanUse(compiled.File)) continue;
+                    if (!function.Definition.CanUse(compiled.File)) continue;
 
-                    if (!functionOverloads.TryGetValue(function.Identifier.Content, out int value)) value = 0;
-                    functionOverloads[function.Identifier.Content] = value + 1;
+                    if (!functionOverloads.TryGetValue(function.Identifier, out int value)) value = 0;
+                    functionOverloads[function.Identifier] = value + 1;
                 }
 
                 foreach (VariableDefinition variable in ast.TopLevelStatements.OfType<VariableDefinition>())
@@ -133,7 +133,7 @@ partial class BytecodeDebugAdapter
                                         result.Add(new CompletionItem()
                                         {
                                             Type = CompletionItemType.Field,
-                                            Label = item.Identifier.Content,
+                                            Label = item.Identifier,
                                             Detail = item.Type.ToString(),
                                         });
                                     }
@@ -141,13 +141,13 @@ partial class BytecodeDebugAdapter
 
                                 foreach (CompiledFunctionDefinition function in compiled.FunctionDefinitions)
                                 {
-                                    if (!function.CanUse(compiled.File)) continue;
+                                    if (!function.Definition.CanUse(compiled.File)) continue;
                                     if (function.Parameters.Length <= 0) continue;
-                                    if (!function.Parameters[0].IsThis) continue;
+                                    if (!function.Parameters[0].Definition.IsThis) continue;
                                     if (!function.Parameters[0].Type.SameAs(prevType)) continue;
 
-                                    if (!functionOverloads.TryGetValue(function.Identifier.Content, out int value)) value = 0;
-                                    functionOverloads[function.Identifier.Content] = value + 1;
+                                    if (!functionOverloads.TryGetValue(function.Identifier, out int value)) value = 0;
+                                    functionOverloads[function.Identifier] = value + 1;
                                 }
                             }
                         }
