@@ -248,6 +248,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 }
                 case GenericType:
                 case AliasType:
+                case EnumType:
                 default:
                     throw new UnreachableException();
             }
