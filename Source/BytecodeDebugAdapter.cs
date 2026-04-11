@@ -199,17 +199,7 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                         _ => throw new UnreachableException(),
                     };
                     break;
-                case PointerType v:
-                {
-                    int pointerValue = memory.Get<int>(address.Start);
-                    variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
-                    if (StatementCompiler.FindSize(v.To, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
-                    {
-                        variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
-                    }
-                    break;
-                }
-                case ReferenceType v:
+                case IReferenceType v:
                 {
                     int pointerValue = memory.Get<int>(address.Start);
                     variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
