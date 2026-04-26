@@ -210,6 +210,8 @@ partial class BytecodeDebugAdapter
                         case BasicType.F32:
                             result = m.Get<float>(resultAddress) != 0;
                             return true;
+                        case BasicType.Void:
+                        case BasicType.Any:
                         default:
                             diagnostics.Add(DiagnosticAt.Error($"Cannot convert a value of type {resultType.FinalValue} to boolean", compiled.Statements[0]));
                             return false; ;
@@ -238,7 +240,7 @@ partial class BytecodeDebugAdapter
 
         if (!IsStopped)
         {
-            foreach (char c in arguments.Expression)
+            foreach (byte c in Encoding.UTF8.GetBytes(arguments.Expression))
             {
                 IO?.SendKey(c);
             }
@@ -246,7 +248,7 @@ partial class BytecodeDebugAdapter
         }
 
         DiagnosticsCollection diagnostics = new();
-        if (TryEvaluate(arguments.Expression, arguments.FrameId, diagnostics, out byte[]? memory, out int resultAddress, out var resultType))
+        if (TryEvaluate(arguments.Expression, arguments.FrameId, diagnostics, out byte[]? memory, out int resultAddress, out GeneralType? resultType))
         {
             ReadOnlySpan<byte> m = memory;
 

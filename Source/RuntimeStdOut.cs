@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Text;
+using LanguageCore;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
@@ -10,11 +10,11 @@ namespace DebugServer;
 
 partial class BytecodeDebugAdapter
 {
-    readonly StringBuilder StdOut = new();
+    readonly AsciiBuilder StdOut = new();
     ArraySegment<CallTraceItem>? StdOutCommonTraceItem;
     int StdOutModifiedAt;
 
-    void WriteStdout(char c)
+    void WriteStdout(byte c)
     {
         if (Processor is null) throw new UnreachableException();
 
@@ -45,7 +45,7 @@ partial class BytecodeDebugAdapter
 
         StdOut.Append(c);
         StdOutModifiedAt = Time;
-        if (c is '\n')
+        if (c is (byte)'\n')
         {
             FlushStdout();
         }
