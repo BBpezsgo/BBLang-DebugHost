@@ -144,7 +144,7 @@ partial class BytecodeDebugAdapter
                                     if (!function.Definition.CanUse(compiled.File)) continue;
                                     if (function.Parameters.Length <= 0) continue;
                                     if (!function.Parameters[0].Definition.IsThis) continue;
-                                    if (!function.Parameters[0].Type.SameAs(prevType)) continue;
+                                    if (!function.Parameters[0].Type.Equals(prevType)) continue;
 
                                     if (!functionOverloads.TryGetValue(function.Identifier, out int value)) value = 0;
                                     functionOverloads[function.Identifier] = value + 1;
