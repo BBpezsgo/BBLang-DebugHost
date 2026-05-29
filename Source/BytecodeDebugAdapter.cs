@@ -3,10 +3,12 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 using System.Threading;
 using LanguageCore;
 using LanguageCore.BBLang.Generator;
 using LanguageCore.Compiler;
+using LanguageCore.Parser;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
@@ -164,6 +166,47 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         }
     }
 
+    static bool TryGetInteger(Range<int> address, ReadOnlySpan<byte> memory, GeneralType type, out int integer)
+    {
+        integer = default;
+        if (type.FinalValue is not BuiltinType builtinType) return false;
+
+        switch (builtinType.Type)
+        {
+            case BasicType.U8:
+                integer = memory.Get<byte>(address.Start);
+                return true;
+            case BasicType.I8:
+                integer = memory.Get<sbyte>(address.Start);
+                return true;
+            case BasicType.U16:
+                integer = memory.Get<ushort>(address.Start);
+                return true;
+            case BasicType.I16:
+                integer = memory.Get<short>(address.Start);
+                return true;
+            case BasicType.U32:
+                integer = (int)memory.Get<uint>(address.Start);
+                return true;
+            case BasicType.I32:
+                integer = memory.Get<int>(address.Start);
+                return true;
+            case BasicType.Void:
+            case BasicType.Any:
+            case BasicType.U64:
+            case BasicType.I64:
+            case BasicType.F32:
+            default:
+                return false;
+        }
+    }
+
+    static string? GetInternalType(GeneralType type) => type is AliasType aliasType
+        && aliasType.Definition.Definition.Attributes.TryGetAttribute(AttributeConstants.InternalType, out AttributeUsage? attribute)
+        && attribute.TryGetValue(out string? internalType)
+        ? internalType
+        : null;
+
     Variable ToVariable(Range<int> address, GeneralType type, ReadOnlySpan<byte> memory, string name, ref UniqueIds ids)
     {
         Variable variable = new()
@@ -180,13 +223,26 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
         }
         else
         {
+            string? internalType = GetInternalType(type);
+
             switch (type.FinalValue)
             {
                 case BuiltinType v:
+                    if (internalType == InternalTypes.Boolean && TryGetInteger(address, memory, type, out int integer))
+                    {
+                        variable.Value = integer == 0 ? "false" : "true";
+                        break;
+                    }
+                    else if (internalType == InternalTypes.Char && TryGetInteger(address, memory, type, out integer))
+                    {
+                        variable.Value = $"'{((char)integer).Escape()}'";
+                        break;
+                    }
+
                     variable.Value = v.Type switch
                     {
                         BasicType.Void => "void",
-                        BasicType.Any => "any",
+                        BasicType.Any => "?",
                         BasicType.U8 => memory.Get<byte>(address.Start).ToString(),
                         BasicType.I8 => memory.Get<sbyte>(address.Start).ToString(),
                         BasicType.U16 => memory.Get<ushort>(address.Start).ToString(),
@@ -203,6 +259,36 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 {
                     int pointerValue = memory.Get<int>(address.Start);
                     variable.Value = $"0x{Convert.ToString(pointerValue, 16)}";
+
+                    if (v.To.Is(out ArrayType? toArray)
+                        && (internalType == InternalTypes.String || GetInternalType(toArray.Of) == InternalTypes.Char)
+                        && StatementCompiler.FindSize(toArray.Of, out int elementSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                    {
+                        StringBuilder valueBuilder = new();
+                        bool finished = false;
+                        for (int i = 0; i < 16; i++)
+                        {
+                            if (TryGetInteger(new Range<int>(pointerValue + (i * elementSize), pointerValue + ((i + 1) * elementSize) - 1), memory, toArray.Of, out int element))
+                            {
+                                if (element == 0)
+                                {
+                                    finished = true;
+                                    break;
+                                }
+                                else
+                                {
+                                    _ = valueBuilder.Append((char)element);
+                                }
+                            }
+                            else
+                            {
+                                goto failed;
+                            }
+                        }
+                        variable.Value = $"{variable.Value} \"{valueBuilder.ToString().Escape()}{(finished ? "\"" : "...")}";
+                    }
+                failed:
+
                     if (StatementCompiler.FindSize(v.To, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
                     {
                         variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
@@ -211,9 +297,28 @@ partial class BytecodeDebugAdapter : DebugAdapterBase
                 }
                 case ArrayType v:
                 {
-                    if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                    if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out int elementSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
                     {
                         variable.Value = "[...]";
+
+                        if (internalType == InternalTypes.String || GetInternalType(v.Of) == InternalTypes.Char)
+                        {
+                            StringBuilder valueBuilder = new();
+                            for (int i = 0; i < v.Length.Value; i++)
+                            {
+                                if (TryGetInteger(new Range<int>(address.Start + (i * elementSize), address.Start + ((i + 1) * elementSize) - 1), memory, v.Of, out int element))
+                                {
+                                    _ = valueBuilder.Append((char)element);
+                                }
+                                else
+                                {
+                                    goto failed;
+                                }
+                            }
+                            variable.Value = $"\"{valueBuilder.ToString().Escape()}\"";
+                        }
+                    failed:
+
                         variable.IndexedVariables = v.Length.Value;
                         variable.VariablesReference = DiscoverIndirectVariables(address.Start, v, memory, name, ref ids);
                     }
