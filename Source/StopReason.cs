@@ -3,42 +3,42 @@ using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
 namespace DebugServer;
 
-abstract class StopReason
+public abstract class StopReason
 {
 
 }
 
-class StopReason_Crash : StopReason
+public class StopReason_Crash : StopReason
 {
     public required RuntimeException Exception { get; init; }
 }
 
-class StopReason_Breakpoint : StopReason
+public class StopReason_Breakpoint : StopReason
 {
     public required Breakpoint Breakpoint { get; init; }
 }
 
-class StopReason_StepForward : StopReason
+public class StopReason_StepForward : StopReason
 {
     public static readonly StopReason_StepForward Instance = new();
 }
 
-class StopReason_StepIn : StopReason
+public class StopReason_StepIn : StopReason
 {
     public static readonly StopReason_StepIn Instance = new();
 }
 
-class StopReason_StepOut : StopReason
+public class StopReason_StepOut : StopReason
 {
     public static readonly StopReason_StepOut Instance = new();
 }
 
-class StopReason_StepInstruction : StopReason
+public class StopReason_StepInstruction : StopReason
 {
     public static readonly StopReason_StepInstruction Instance = new();
 }
 
-class StopReason_Pause : StopReason
+public class StopReason_Pause : StopReason
 {
     public static readonly StopReason_Pause Instance = new();
 }

@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Threading;
 
@@ -9,7 +10,7 @@ class FileLogger : Logger
 
     public FileLogger(string path)
     {
-        File.WriteAllBytes(path, []);
+        File.WriteAllBytes(path, Array.Empty<byte>());
         file = File.OpenWrite(path);
         stream = new StreamWriter(file);
         @lock = new();

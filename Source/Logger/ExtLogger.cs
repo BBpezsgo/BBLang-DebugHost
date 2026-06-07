@@ -2,8 +2,15 @@ using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 
 namespace DebugServer;
 
-class ExtLogger(DebugProtocolClient protocol) : Logger
+public class ExtLogger : Logger
 {
+    private readonly DebugProtocolClient protocol;
+
+    public ExtLogger(DebugProtocolClient protocol)
+    {
+        this.protocol = protocol;
+    }
+
     void Send(string message, string? level)
     {
         if (!protocol.IsRunning) return;

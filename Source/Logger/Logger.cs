@@ -1,6 +1,6 @@
 using System;
 
-abstract class Logger : IDisposable
+public abstract class Logger : IDisposable
 {
     public abstract void WriteLine(string? value);
     public void WriteLine(object? value) => WriteLine(value?.ToString());

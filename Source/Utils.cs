@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 
-static class Utils
+namespace DebugServer;
+
+public static class Utils
 {
     public static (int Start, int Length) FixRange(int totalLength, int? start, int? length)
     {

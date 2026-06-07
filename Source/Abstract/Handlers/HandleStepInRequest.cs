@@ -1,0 +1,17 @@
+using System;
+using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
+
+namespace DebugServer;
+
+partial class BytecodeDebugAdapterBase
+{
+    protected override StepInResponse HandleStepInRequest(StepInArguments arguments)
+    {
+        Log.Trace($"[Handler] StepIn");
+
+        if (NoDebug) throw new InvalidOperationException($"Cannot handle request StepIn in no-debug mode");
+
+        Continue(arguments.Granularity == SteppingGranularity.Instruction ? StopReason_StepInstruction.Instance : StopReason_StepIn.Instance);
+        return new StepInResponse();
+    }
+}
