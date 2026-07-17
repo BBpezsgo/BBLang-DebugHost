@@ -90,7 +90,7 @@ partial class BytecodeDebugAdapterBase
                     }
                     case ArrayType v:
                     {
-                        if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out int elementSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                        if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out int elementSize, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
                         {
                             for (int i = 0; i < v.Length.Value; i++)
                             {
@@ -105,7 +105,7 @@ partial class BytecodeDebugAdapterBase
                         foreach (CompiledField item in v.Struct.Fields)
                         {
                             GeneralType fieldType = GeneralType.TryInsertTypeParameters(item.Type, v.TypeArguments);
-                            if (!StatementCompiler.FindSize(fieldType, out int fieldSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                            if (!StatementCompiler.FindSize(fieldType, out int fieldSize, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
                             {
                                 break;
                             }

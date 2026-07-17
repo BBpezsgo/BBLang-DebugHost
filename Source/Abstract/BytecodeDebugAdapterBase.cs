@@ -12,7 +12,6 @@ using LanguageCore.Parser;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
-using SysThread = System.Threading.Thread;
 
 namespace DebugServer;
 
@@ -140,7 +139,7 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
 
     protected Variable ToVariable(int address, GeneralType type, ReadOnlySpan<byte> memory, string name, ref UniqueIds ids)
     {
-        if (!StatementCompiler.FindSize(type, out int size, out _, new RuntimeInfoProvider() { PointerSize = CodeGeneratorForMain.DefaultCompilerSettings.PointerSize }))
+        if (!StatementCompiler.FindSize(type, out int size, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
         {
             return new Variable()
             {
@@ -250,7 +249,7 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
 
                     if (v.To.Is(out ArrayType? toArray)
                         && (internalType == InternalTypes.String || GetInternalType(toArray.Of) == InternalTypes.Char)
-                        && StatementCompiler.FindSize(toArray.Of, out int elementSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                        && StatementCompiler.FindSize(toArray.Of, out int elementSize, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
                     {
                         StringBuilder valueBuilder = new();
                         bool finished = false;
@@ -277,7 +276,7 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
                     }
                 failed:
 
-                    if (StatementCompiler.FindSize(v.To, out _, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                    if (StatementCompiler.FindSize(v.To, out _, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
                     {
                         variable.VariablesReference = DiscoverIndirectVariables(pointerValue, v.To, memory, name, ref ids);
                     }
@@ -285,7 +284,7 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
                 }
                 case ArrayType v:
                 {
-                    if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out int elementSize, out _, new RuntimeInfoProvider() { PointerSize = MainGeneratorSettings.Default.PointerSize }))
+                    if (v.Length.HasValue && StatementCompiler.FindSize(v.Of, out int elementSize, out _, CodeGeneratorForMain.DefaultCompilerSettings.RuntimeInfo))
                     {
                         variable.Value = "[...]";
 
@@ -504,7 +503,7 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
         }
     }
 
-    protected virtual Source ToSource(Uri uri) => new Source()
+    protected virtual Source ToSource(Uri uri) => new()
     {
         Name = Path.GetFileName(uri.ToString()),
         Path = uri.ToString(),
