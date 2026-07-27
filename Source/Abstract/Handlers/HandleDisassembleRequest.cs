@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
@@ -29,7 +28,7 @@ partial class BytecodeDebugAdapterBase
                 if (j >= Processor.Code.Length) break;
                 Instruction c = Processor.Code[j];
 
-                if (DebugInformation.TryGetSourceLocation(j, out SourceCodeLocation sourceLocation))
+                if (DebugInformation.TryGetSourceLocation(j, out SourceCodeLocation sourceLocation, true))
                 {
                     result.Add(new DisassembledInstruction()
                     {

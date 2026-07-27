@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using LanguageCore.Runtime;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 using StackFrame = Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages.StackFrame;
@@ -19,7 +18,7 @@ partial class BytecodeDebugAdapterBase
             {
                 string functionName = frame.Function.ReadableIdentifier() ?? $"<{frame.Raw.InstructionPointer}>";
 
-                if (DebugInformation.TryGetSourceLocation(frame.Raw.InstructionPointer, out SourceCodeLocation location))
+                if (DebugInformation.TryGetSourceLocation(frame.Raw.InstructionPointer, out SourceCodeLocation location, true))
                 {
                     result.Add(new StackFrame()
                     {

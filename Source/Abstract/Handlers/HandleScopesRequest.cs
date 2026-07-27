@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using Microsoft.VisualStudio.Shared.VSCodeDebugProtocol.Messages;
 
 namespace DebugServer;
@@ -20,15 +19,15 @@ partial class BytecodeDebugAdapterBase
                 FetchedFrame item = StackFrames[i];
                 if (item.Id != arguments.FrameId) continue;
                 List<Scope> result = new();
-                if (i == 0)
-                {
-                    result.Add(new Scope()
-                    {
-                        Name = "Registers",
-                        PresentationHint = Scope.PresentationHintValue.Registers,
-                        VariablesReference = int.MaxValue,
-                    });
-                }
+                //if (i == 0)
+                //{
+                //    result.Add(new Scope()
+                //    {
+                //        Name = "Registers",
+                //        PresentationHint = Scope.PresentationHintValue.Registers,
+                //        VariablesReference = int.MaxValue,
+                //    });
+                //}
                 foreach (FetchedScope scope in item.Scopes)
                 {
                     (string name, Scope.PresentationHintValue presentationHint) = scope.Kind switch

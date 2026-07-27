@@ -451,22 +451,22 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
                     //Log.Trace($"Ignoring internal stack item {item.Value.Type} {item.Value.Identifier} ({item.Value.Size} bytes at {(item.Value.BasePointerRelative ? "BP+" : "ABS+")}{item.Value.Address})");
                 }
 
-                if (arguments.Count > 0)
-                {
-                    frameScopes.Add(new FetchedScope(
-                        CurrentUniqueIds.Next(),
-                        FetchedScopeKind.Arguments,
-                        arguments.ToImmutableArray(),
-                        scope
-                    ));
-                }
-
                 if (locals.Count > 0)
                 {
                     frameScopes.Add(new FetchedScope(
                         CurrentUniqueIds.Next(),
                         FetchedScopeKind.Locals,
                         locals.ToImmutableArray(),
+                        scope
+                    ));
+                }
+
+                if (arguments.Count > 0)
+                {
+                    frameScopes.Add(new FetchedScope(
+                        CurrentUniqueIds.Next(),
+                        FetchedScopeKind.Arguments,
+                        arguments.ToImmutableArray(),
                         scope
                     ));
                 }
@@ -481,15 +481,15 @@ public abstract partial class BytecodeDebugAdapterBase : DebugAdapterBase
                     ));
                 }
 
-                if (returnValue.Count > 0)
-                {
-                    frameScopes.Add(new FetchedScope(
-                        CurrentUniqueIds.Next(),
-                        FetchedScopeKind.ReturnValue,
-                        returnValue.ToImmutableArray(),
-                        scope
-                    ));
-                }
+                //if (returnValue.Count > 0)
+                //{
+                //    frameScopes.Add(new FetchedScope(
+                //        CurrentUniqueIds.Next(),
+                //        FetchedScopeKind.ReturnValue,
+                //        returnValue.ToImmutableArray(),
+                //        scope
+                //    ));
+                //}
             }
 
             StackFrames.Add(new FetchedFrame(

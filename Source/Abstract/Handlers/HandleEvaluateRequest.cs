@@ -263,7 +263,7 @@ partial class BytecodeDebugAdapterBase
         }
 
         DiagnosticsCollection diagnostics = new();
-        if (TryEvaluate(arguments.Expression, arguments.FrameId, diagnostics, out byte[]? memory, out int resultAddress, out GeneralType? resultType, out var error))
+        if (TryEvaluate(arguments.Expression, arguments.FrameId, diagnostics, out byte[]? memory, out int resultAddress, out GeneralType? resultType, out RuntimeException? error))
         {
             ReadOnlySpan<byte> m = memory;
 
